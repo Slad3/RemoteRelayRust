@@ -71,7 +71,7 @@ impl KasaPlug {
         stream.read(&mut data).unwrap();
 
         let a_ref: &[u8] = &data[..4];
-        let b = i32::from_be_bytes(<[u8; 4]>::try_from(a_ref).expect("Oops, I did it again..."));
+        let b = i32::from_be_bytes(<[u8; 4]>::try_from(a_ref).expect("Unable to parse bytes"));
 
         let end_pos: i32 = b + 4 as i32;
 
