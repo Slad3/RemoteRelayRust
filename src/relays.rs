@@ -1,17 +1,21 @@
+#![allow(unused)]
+
 use serde_json::{Value};
 
 use std::net::{TcpStream};
 use std::io::{Read, Write};
 use std::{vec};
 use std::convert::{TryFrom};
+use rocket::time::Error;
 use serde_json::json;
 
+#[derive(Debug)]
 pub struct KasaPlug {
-    ip: String,
-    name: String,
+    pub(crate)ip: String,
+    pub(crate)name: String,
     pub(crate) status: bool,
     tags: Vec<String>,
-    room: String,
+    pub(crate)room: String,
 }
 
 impl KasaPlug {
@@ -42,12 +46,6 @@ impl KasaPlug {
 
     pub fn new(ip: String, name: String, room: String) -> Self {
         let mut tags: Vec<String> = Vec::new();
-        let name = if name.is_empty() {
-            tags.push(format!("Plug {}", ip));
-            format!("Plug {}", ip)
-        } else {
-            name
-        };
         let mut plug = KasaPlug {
             ip,
             name,
@@ -55,8 +53,12 @@ impl KasaPlug {
             tags,
             room,
         };
-        plug.status = KasaPlug::get_status(&mut plug);
+        // plug.status = KasaPlug::get_status(&mut plug);
         plug
+    }
+
+    pub fn new_static(ip: &str, name: &str, room: &str) -> Self {
+        KasaPlug::new(ip.to_string(), name.to_string(), room.to_string())
     }
 
 
@@ -64,7 +66,7 @@ impl KasaPlug {
         const PORT: u16 = 9999;
         let timeout = 10;
         let mut stream = TcpStream::connect((self.ip.to_string(), PORT)).unwrap();
-        stream.set_read_timeout(Some(std::time::Duration::from_secs(timeout))).unwrap();
+        let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(timeout)));
         let encrypted = KasaPlug::encrypt(cmd);
         stream.write_all(&encrypted).unwrap();
         let mut data = vec![0; 4096];
@@ -91,11 +93,11 @@ impl KasaPlug {
     }
 
 
-    pub(crate) fn connected(&mut self) -> bool {
-        self.get_status()
+    pub(crate) fn connected(&mut self) -> Result<bool, Error> {
+        Ok(self.get_status())
     }
 
-    pub fn meta(&mut self) -> Value {
+    pub fn meta(&self) -> Value {
         return json!({
             "type": "Kasa Plug",
             "ip": &self.ip.to_string(),
@@ -107,7 +109,8 @@ impl KasaPlug {
 
     pub fn get_status(&mut self) -> bool {
         let cmd = json!({"system": {"get_sysinfo": {}}});
-        let relay_state = self.send(cmd.to_string())["system"]["get_sysinfo"]["relay_state"].as_u64().unwrap_or(0) == 1;
+        let result = self.send(cmd.to_string());
+        let relay_state = result["system"]["get_sysinfo"]["relay_state"].as_u64().unwrap_or(0) == 1;
         self.status = relay_state;
         relay_state
     }
