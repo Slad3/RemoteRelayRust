@@ -139,7 +139,7 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, std::io::Error> 
 
     match found {
         true => Ok(true),
-        false => Err(Error::new(ErrorKind::Other, format!("Can't find Relay"))),
+        false => Err(Error::new(ErrorKind::Other, "Can't find Relay".to_string())),
     }
 }
 
