@@ -1,16 +1,15 @@
-use std::collections::HashMap;
 use crate::models;
+use std::collections::HashMap;
 
 use rocket::tokio::sync::Mutex;
 
-use std::fs;
-use std::error;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value, from_str};
+use serde_json::{from_str, json, Value};
+use std::error;
+use std::fs;
 
-use models::relays::{Relay, KasaPlug};
 use models::presets::Preset;
-
+use models::relays::{KasaPlug, Relay};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoadedConfig {
@@ -96,5 +95,4 @@ mod tests {
         let presets = load_presets(loaded_config.presets);
         println!("{:?}", &presets);
     }
-
 }

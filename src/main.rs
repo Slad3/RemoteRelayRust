@@ -11,8 +11,10 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::vec;
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
+use models::presets::Preset;
+use models::relays::KasaPlug;
 use rocket::http::uri::fmt::UriQueryArgument::Raw;
 use rocket::request::FromRequest;
 use rocket::response::content;
@@ -20,8 +22,6 @@ use rocket::response::content::{RawHtml, RawJson, RawText};
 use rocket::yansi::Paint;
 use rocket::{futures, tokio, Build, Request, Rocket, State};
 use serde_json::map::Values;
-use models::relays::KasaPlug;
-use models::presets::Preset;
 use utils::local_config_utils::load_config;
 
 #[macro_use]
@@ -60,16 +60,14 @@ pub fn switch_route() -> RawJson<String> {
     RawJson(json!( {"Switched": true}).to_string())
 }
 
-
 #[get("/refresh")]
 fn refresh_route() -> RawJson<String> {
     let initial_setup = setup();
     match initial_setup {
         Ok(initial_setup) => RawJson(json!( {"Refreshed": true}).to_string()),
-        Err(error) => RawJson(json!( {"Refreshed": false}).to_string())
+        Err(error) => RawJson(json!( {"Refreshed": false}).to_string()),
     }
 }
-
 
 #[get("/getPresets")]
 fn get_presets_route() -> RawJson<String> {
@@ -82,13 +80,17 @@ fn get_presets_route() -> RawJson<String> {
     RawJson(serde_json::to_string(&result).expect("Penis"))
 }
 
-
 #[get("/setPreset/<preset_name>")]
 fn set_preset_route(preset_name: String) -> RawJson<String> {
     let mut found = false;
     unsafe {
         for pres in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            println!("{} {} {}", pres.name.to_lowercase() == preset_name.to_lowercase(), pres.name.to_lowercase(), preset_name.to_lowercase());
+            println!(
+                "{} {} {}",
+                pres.name.to_lowercase() == preset_name.to_lowercase(),
+                pres.name.to_lowercase(),
+                preset_name.to_lowercase()
+            );
             if (pres.name.to_lowercase() == preset_name.to_lowercase()) {
                 set_preset(pres);
                 found = true;
@@ -99,7 +101,7 @@ fn set_preset_route(preset_name: String) -> RawJson<String> {
 
     match found {
         true => RawJson(json!( {"PresetSet": true}).to_string()),
-        false => RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string())
+        false => RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string()),
     }
 }
 
@@ -110,10 +112,11 @@ fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
 
     match result {
         Ok(result) => RawJson(json!( {"RelaySet": true}).to_string()),
-        Err(error) => RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string())
+        Err(error) => {
+            RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string())
+        }
     }
 }
-
 
 fn set_preset(preset: &Preset) {
     println!("{:?}", preset.relays);
@@ -130,8 +133,12 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
             if (relay.name.to_lowercase() == relay_name.to_lowercase()) {
                 found = true;
                 match value {
-                    true => {let _ = relay.turn_on().expect("Can't Connect to Plug");},
-                    false => {let _ = relay.turn_off().expect("Can't Connect to Plug");}
+                    true => {
+                        let _ = relay.turn_on().expect("Can't Connect to Plug");
+                    }
+                    false => {
+                        let _ = relay.turn_off().expect("Can't Connect to Plug");
+                    }
                 }
             }
         }
@@ -143,7 +150,7 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
     }
 }
 
-fn setup() -> Result<bool, Error>{
+fn setup() -> Result<bool, Error> {
     let config = load_config()?;
 
     unsafe {
@@ -154,21 +161,24 @@ fn setup() -> Result<bool, Error>{
     Ok(true)
 }
 
-
 #[launch]
 fn rocket() -> _ {
-
     let initial_setup = setup();
     match initial_setup {
-        Ok(initial_setup) => {println!("Initial Setup Successful")},
-        Err(error) => panic!("{}", format!("Initial setup failed {error}"))
+        Ok(initial_setup) => {
+            println!("Initial Setup Successful")
+        }
+        Err(error) => panic!("{}", format!("Initial setup failed {error}")),
     }
 
-    rocket::build().mount("/",
-                          routes![
-                            index_state,
-                            status_route,
-                            switch_route,
-                            get_presets_route,
-                            set_preset_route])
+    rocket::build().mount(
+        "/",
+        routes![
+            index_state,
+            status_route,
+            switch_route,
+            get_presets_route,
+            set_preset_route
+        ],
+    )
 }

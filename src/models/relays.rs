@@ -1,13 +1,13 @@
 use serde_json::Value;
 
+use lazy_static::lazy_static;
+use rocket::serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
 use std::convert::TryFrom;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::vec;
-use lazy_static::lazy_static;
-use rocket::serde::Deserialize;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct Relay {
@@ -25,7 +25,6 @@ pub struct KasaPlug {
     pub(crate) status: bool,
     pub(crate) room: String,
     pub(crate) tags: Vec<String>,
-
 }
 
 impl KasaPlug {
@@ -94,10 +93,11 @@ impl KasaPlug {
         let cmd = json!({"system": {"get_sysinfo": {}}});
         let result = self.send(cmd.to_string());
         match result {
-            Ok(result) => {
-                Ok(result["system"]["get_sysinfo"].clone())
-            }
-            Err(result) => { Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string())) }
+            Ok(result) => Ok(result["system"]["get_sysinfo"].clone()),
+            Err(result) => Err(Error::new(
+                ErrorKind::ConnectionRefused,
+                "Can't Connect To Plug".to_string(),
+            )),
         }
     }
 
@@ -134,9 +134,10 @@ impl KasaPlug {
                 self.status = relay_state;
                 Ok(relay_state)
             }
-            Err(error) => {
-                Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string()))
-            }
+            Err(error) => Err(Error::new(
+                ErrorKind::ConnectionRefused,
+                "Can't Connect To Plug".to_string(),
+            )),
         }
     }
 
@@ -148,7 +149,10 @@ impl KasaPlug {
                 self.status = false;
                 Ok(true)
             }
-            Err(error) => { Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string())) }
+            Err(error) => Err(Error::new(
+                ErrorKind::ConnectionRefused,
+                "Can't Connect To Plug".to_string(),
+            )),
         }
     }
 
@@ -160,14 +164,17 @@ impl KasaPlug {
                 self.status = true;
                 Ok(true)
             }
-            Err(error) => { Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string())) }
+            Err(error) => Err(Error::new(
+                ErrorKind::ConnectionRefused,
+                "Can't Connect To Plug".to_string(),
+            )),
         }
     }
 
     pub fn switch(&mut self) -> Result<bool, Error> {
         return match self.status {
             true => self.turn_off(),
-            false => self.turn_on()
+            false => self.turn_on(),
         };
     }
 }
