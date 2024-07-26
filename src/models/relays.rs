@@ -1,21 +1,32 @@
-#![allow(unused)]
+use serde_json::Value;
 
-use serde_json::{Value};
-
-use std::net::{TcpStream};
-use std::io::{Read, Write};
-use std::{vec};
-use std::convert::{TryFrom};
 use rocket::time::Error;
+use serde::Serialize;
 use serde_json::json;
+use std::convert::TryFrom;
+use std::io::{Read, Write};
+use std::net::TcpStream;
+use std::vec;
+use rocket::serde::Deserialize;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct Relay {
+    #[serde(rename = "type")]
+    pub(crate) relay_type: String,
+    pub(crate) name: String,
+    pub(crate) ip: String,
+    pub(crate) room: String,
+}
+
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct KasaPlug {
-    pub(crate)ip: String,
-    pub(crate)name: String,
+    pub(crate) ip: String,
+    pub(crate) name: String,
     pub(crate) status: bool,
-    tags: Vec<String>,
-    pub(crate)room: String,
+    pub(crate) room: String,
+    pub(crate) tags: Vec<String>,
+
 }
 
 impl KasaPlug {
@@ -61,7 +72,6 @@ impl KasaPlug {
         KasaPlug::new(ip.to_string(), name.to_string(), room.to_string())
     }
 
-
     pub fn send(&self, cmd: String) -> Value {
         const PORT: u16 = 9999;
         let timeout = 10;
@@ -92,17 +102,17 @@ impl KasaPlug {
         self.send(cmd.to_string())
     }
 
-
     pub(crate) fn connected(&mut self) -> Result<bool, Error> {
         Ok(self.get_status())
     }
 
-    pub fn meta(&self) -> Value {
+    pub fn to_json(&self) -> Value {
         return json!({
             "type": "Kasa Plug",
             "ip": &self.ip.to_string(),
-            "room": &self.room.to_string(),
+            "name": &self.name.to_string(),
             "status": &self.status,
+            "room": &self.room.to_string(),
             "tags": &self.tags,
         });
     }
@@ -110,30 +120,30 @@ impl KasaPlug {
     pub fn get_status(&mut self) -> bool {
         let cmd = json!({"system": {"get_sysinfo": {}}});
         let result = self.send(cmd.to_string());
-        let relay_state = result["system"]["get_sysinfo"]["relay_state"].as_u64().unwrap_or(0) == 1;
+        let relay_state = result["system"]["get_sysinfo"]["relay_state"]
+            .as_u64()
+            .unwrap_or(0)
+            == 1;
         self.status = relay_state;
         relay_state
     }
 
     pub fn turn_off(&mut self) {
-        self.status = false;
         let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
         let _ = self.send(cmd.to_string())["system"].clone();
         self.status = false;
     }
 
     pub fn turn_on(&mut self) {
-        self.status = true;
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
         let _ = self.send(cmd.to_string())["system"].clone();
         self.status = true;
     }
 
     pub fn switch(&mut self) {
-        if self.status {
-            self.turn_off()
-        } else {
-            self.turn_on()
+        match self.status {
+            true => self.turn_off(),
+            false => self.turn_on(),
         }
     }
 }
@@ -143,4 +153,3 @@ impl std::fmt::Display for KasaPlug {
         write!(f, "{}", self.name)
     }
 }
-
