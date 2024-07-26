@@ -22,7 +22,7 @@ use rocket::{futures, tokio, Build, Request, Rocket, State};
 use serde_json::map::Values;
 use models::relays::KasaPlug;
 use models::presets::Preset;
-use utils::config_helpers::load_config;
+use utils::local_config_utils::load_config;
 
 #[macro_use]
 extern crate rocket;
@@ -57,7 +57,7 @@ pub fn switch_route() -> RawJson<String> {
         }
     }
 
-    unsafe { RawJson(RELAYS.lock().unwrap().get(0).unwrap().to_json().to_string()) }
+    RawJson(json!( {"Switched": true}).to_string())
 }
 
 
@@ -122,7 +122,7 @@ fn set_preset(preset: &Preset) {
     }
 }
 
-fn set_relay(relay_name: &String, value: &bool) -> Result<bool, std::io::Error> {
+fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
     let mut found = false;
     unsafe {
         let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
@@ -130,8 +130,8 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, std::io::Error> 
             if (relay.name.to_lowercase() == relay_name.to_lowercase()) {
                 found = true;
                 match value {
-                    true => relay.turn_on(),
-                    false => relay.turn_off()
+                    true => {let _ = relay.turn_on().expect("Can't Connect to Plug");},
+                    false => {let _ = relay.turn_off().expect("Can't Connect to Plug");}
                 }
             }
         }

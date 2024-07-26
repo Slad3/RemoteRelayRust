@@ -1,12 +1,12 @@
 use serde_json::Value;
 
-use rocket::time::Error;
 use serde::Serialize;
 use serde_json::json;
 use std::convert::TryFrom;
-use std::io::{Read, Write};
+use std::io::{Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::vec;
+use lazy_static::lazy_static;
 use rocket::serde::Deserialize;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -17,7 +17,6 @@ pub(crate) struct Relay {
     pub(crate) ip: String,
     pub(crate) room: String,
 }
-
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct KasaPlug {
@@ -64,7 +63,6 @@ impl KasaPlug {
             tags,
             room,
         };
-        // plug.status = KasaPlug::get_status(&mut plug);
         plug
     }
 
@@ -72,38 +70,44 @@ impl KasaPlug {
         KasaPlug::new(ip.to_string(), name.to_string(), room.to_string())
     }
 
-    pub fn send(&self, cmd: String) -> Value {
+    pub fn send(&self, cmd: String) -> Result<Value, Error> {
         const PORT: u16 = 9999;
         let timeout = 10;
-        let mut stream = TcpStream::connect((self.ip.to_string(), PORT)).unwrap();
+        let mut stream = TcpStream::connect((self.ip.to_string(), PORT))?;
         let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(timeout)));
         let encrypted = KasaPlug::encrypt(cmd);
-        stream.write_all(&encrypted).unwrap();
+        stream.write_all(&encrypted)?;
         let mut data = vec![0; 4096];
-        stream.read(&mut data).unwrap();
+        stream.read(&mut data)?;
 
         let a_ref: &[u8] = &data[..4];
         let b = i32::from_be_bytes(<[u8; 4]>::try_from(a_ref).expect("Unable to parse bytes"));
 
-        let end_pos: i32 = b + 4 as i32;
+        let end_pos: i32 = b + 4i32;
 
         let decrypted = KasaPlug::decrypt(data[4..end_pos as usize].to_vec());
-        let json_data: Value = serde_json::from_str(&decrypted.as_str()).unwrap();
-        return json_data;
+        let json_data: Value = serde_json::from_str(&decrypted.as_str())?;
+        Ok(json_data)
     }
 
-    pub fn get_info(&self) -> Value {
+    pub fn get_info(&self) -> Result<Value, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
-        self.send(cmd.to_string())["system"]["get_sysinfo"].clone()
+        let result = self.send(cmd.to_string());
+        match result {
+            Ok(result) => {
+                Ok(result["system"]["get_sysinfo"].clone())
+            }
+            Err(result) => { Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string())) }
+        }
     }
 
-    pub fn wlan_scan(&self) -> Value {
+    pub fn wlan_scan(&self) -> Result<Value, Error> {
         let cmd = json!({"netif": {"get_scaninfo": {"refresh": 0}}});
         self.send(cmd.to_string())
     }
 
     pub(crate) fn connected(&mut self) -> Result<bool, Error> {
-        Ok(self.get_status())
+        self.get_status()
     }
 
     pub fn to_json(&self) -> Value {
@@ -117,34 +121,54 @@ impl KasaPlug {
         });
     }
 
-    pub fn get_status(&mut self) -> bool {
+    pub fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
         let result = self.send(cmd.to_string());
-        let relay_state = result["system"]["get_sysinfo"]["relay_state"]
-            .as_u64()
-            .unwrap_or(0)
-            == 1;
-        self.status = relay_state;
-        relay_state
-    }
 
-    pub fn turn_off(&mut self) {
-        let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
-        let _ = self.send(cmd.to_string())["system"].clone();
-        self.status = false;
-    }
-
-    pub fn turn_on(&mut self) {
-        let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
-        let _ = self.send(cmd.to_string())["system"].clone();
-        self.status = true;
-    }
-
-    pub fn switch(&mut self) {
-        match self.status {
-            true => self.turn_off(),
-            false => self.turn_on(),
+        match result {
+            Ok(result) => {
+                let relay_state = result["system"]["get_sysinfo"]["relay_state"]
+                    .as_u64()
+                    .unwrap_or(0)
+                    == 1;
+                self.status = relay_state;
+                Ok(relay_state)
+            }
+            Err(error) => {
+                Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string()))
+            }
         }
+    }
+
+    pub fn turn_off(&mut self) -> Result<bool, Error> {
+        let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
+        let result = self.send(cmd.to_string());
+        match result {
+            Ok(result) => {
+                self.status = false;
+                Ok(true)
+            }
+            Err(error) => { Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string())) }
+        }
+    }
+
+    pub fn turn_on(&mut self) -> Result<bool, Error> {
+        let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
+        let result = self.send(cmd.to_string());
+        match result {
+            Ok(result) => {
+                self.status = true;
+                Ok(true)
+            }
+            Err(error) => { Err(Error::new(ErrorKind::ConnectionRefused, "Can't Connect To Plug".to_string())) }
+        }
+    }
+
+    pub fn switch(&mut self) -> Result<bool, Error> {
+        return match self.status {
+            true => self.turn_off(),
+            false => self.turn_on()
+        };
     }
 }
 
