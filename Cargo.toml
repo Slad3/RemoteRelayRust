@@ -13,6 +13,6 @@ pre-commit-hooks = "0.3.0"
 cargo-sort = "1.0.9"
 
 
-[workspace.metadata.precommit]
+[package.metadata.precommit]
 fmt = "cargo fmt"
 #sort = "cargo sort"
