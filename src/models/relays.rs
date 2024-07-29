@@ -1,6 +1,5 @@
 use serde_json::Value;
 
-use lazy_static::lazy_static;
 use rocket::serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
