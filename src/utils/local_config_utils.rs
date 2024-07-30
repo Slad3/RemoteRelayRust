@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use crate::models;
 
 use serde::{Deserialize, Serialize};
@@ -16,7 +17,7 @@ pub struct LoadedConfig {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub(crate) relays: Vec<KasaPlug>,
-    pub(crate) presets: Vec<Preset>,
+    pub(crate) presets: HashMap<String, Preset>,
 }
 
 pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
@@ -48,14 +49,14 @@ fn load_relays(from_config: Vec<Relay>) -> Vec<KasaPlug> {
     relays
 }
 
-fn load_presets(from_config: Vec<Preset>) -> Vec<Preset> {
-    let mut presets: Vec<Preset> = Vec::new();
+fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
+    let mut presets: HashMap<String, Preset> = HashMap::new();
     for i in from_config {
-        presets.push(Preset {
+        presets.insert(i.name.clone(), Preset {
             name: i.name,
             enabled: false,
             relays: i.relays,
-        })
+        });
     }
 
     presets
@@ -65,7 +66,7 @@ pub fn load_config() -> Result<Config, std::io::Error> {
     let loaded_config = load_config_from_file()?;
 
     let relays: Vec<KasaPlug> = load_relays(loaded_config.relays);
-    let presets: Vec<Preset> = load_presets(loaded_config.presets);
+    let presets: HashMap<String, Preset> = load_presets(loaded_config.presets);
     Ok(Config { relays, presets })
 }
 

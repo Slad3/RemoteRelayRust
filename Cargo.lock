@@ -7,6 +7,8 @@ name = "RemoteRelayRust"
 version = "0.1.0"
 dependencies = [
  "dotenv_codegen",
+ "lazy_static",
+ "once_cell",
  "rocket",
  "serde",
  "serde_json",

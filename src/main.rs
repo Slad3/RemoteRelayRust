@@ -2,12 +2,11 @@ mod models;
 mod routes;
 mod utils;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::io::{Error, ErrorKind};
 use std::string::ToString;
 use std::sync::Mutex;
 use std::vec;
-
 use serde_json::{json, Value};
 
 use models::presets::Preset;
@@ -19,12 +18,22 @@ use rocket::response::content::RawJson;
 use rocket::{Request, Response};
 
 use utils::local_config_utils::load_config;
+use once_cell::sync::Lazy;
 
 #[macro_use]
 extern crate rocket;
 
 static mut RELAYS: Mutex<Vec<KasaPlug>> = Mutex::new(Vec::new());
-static mut PRESETS: Mutex<Vec<Preset>> = Mutex::new(Vec::new());
+
+// static mut PRESETS: Mutex<HashMap<String, Preset>> = Mutex::new(HashMap::new());
+static mut PRESETS: Lazy<Mutex<HashMap<String, Preset>>> = Lazy::new( || {Mutex::new(HashMap::new())});
+
+
+// use once_cell::lazy_static;
+//
+// lazy_static! {
+//     static mut PRESETS: Mutex<HashMap<String, Preset>> = Mutex::new(HashMap::new());
+// }
 
 #[get("/")]
 fn index_state() -> RawJson<String> {
@@ -69,7 +78,7 @@ fn refresh_route() -> RawJson<String> {
 fn get_presets_route() -> RawJson<String> {
     let mut result: Vec<Value> = Vec::new();
     unsafe {
-        for preset in PRESETS.lock().expect("Error getting global PRESETS").iter() {
+        for (_, preset) in PRESETS.lock().expect("Error getting global PRESETS").iter() {
             result.push(preset.to_json());
         }
     }
@@ -80,8 +89,8 @@ fn get_presets_route() -> RawJson<String> {
 fn get_preset_names_route() -> RawJson<String> {
     let mut result: Vec<String> = Vec::new();
     unsafe {
-        for preset in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            result.push(preset.name.to_string());
+        for (name, _) in PRESETS.lock().expect("Error getting global PRESETS").iter() {
+            result.push(name.clone());
         }
     }
 
@@ -90,20 +99,16 @@ fn get_preset_names_route() -> RawJson<String> {
 
 #[get("/preset/setPreset/<preset_name>")]
 fn set_preset_route(preset_name: String) -> RawJson<String> {
-    let mut found = false;
     unsafe {
-        for pres in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            if pres.name.to_lowercase() == preset_name.to_lowercase() {
-                set_preset(pres);
-                found = true;
-                break;
-            }
+        let preset = Lazy::get(&PRESETS).expect("REASON").lock().expect("Error getting global PRESETS").get(&preset_name);
+        match preset {
+            Some(value) => {
+                set_preset(&value);
+                RawJson(json!( {"PresetSet": true}).to_string())
+            },
+            _ => RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string()),
         }
-    }
 
-    match found {
-        true => RawJson(json!( {"PresetSet": true}).to_string()),
-        false => RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string()),
     }
 }
 
@@ -190,7 +195,7 @@ fn setup() -> Result<bool, Error> {
 
     unsafe {
         RELAYS = Mutex::new(config.relays);
-        PRESETS = Mutex::new(config.presets);
+        *PRESETS = Mutex::new(config.presets);
     }
 
     Ok(true)
