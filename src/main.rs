@@ -1,13 +1,10 @@
-#![allow(unused)]
-
 mod models;
 mod routes;
 mod utils;
 
+use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
-use std::ops::Deref;
 use std::string::ToString;
-use std::sync::Arc;
 use std::sync::Mutex;
 use std::vec;
 
@@ -15,13 +12,12 @@ use serde_json::{json, Value};
 
 use models::presets::Preset;
 use models::relays::KasaPlug;
-use rocket::http::uri::fmt::UriQueryArgument::Raw;
-use rocket::request::FromRequest;
-use rocket::response::content;
-use rocket::response::content::{RawHtml, RawJson, RawText};
-use rocket::yansi::Paint;
-use rocket::{futures, tokio, Build, Request, Rocket, State};
-use serde_json::map::Values;
+
+use rocket::{Request, Response};
+use rocket::fairing::{Fairing, Info, Kind};
+use rocket::http::Header;
+use rocket::response::content::{RawJson};
+
 use utils::local_config_utils::load_config;
 
 #[macro_use]
@@ -37,14 +33,16 @@ fn index_state() -> RawJson<String> {
 
 #[get("/status")]
 fn status_route() -> RawJson<String> {
-    let mut result = json!({});
-    unsafe {
-        for relay in RELAYS.lock().expect("Error getting global RELAYS").iter() {
-            let id = relay.ip.to_string();
-            result[id] = relay.to_json();
+    let status: Result<Value, Error> = get_status();
+
+    match status {
+        Ok(result) => {
+            RawJson(result.to_string())
+        }
+        Err(error) => {
+            RawJson(json!( {"Error": format!("Could not get status {}", error)}).to_string())
         }
     }
-    RawJson(result.to_string())
 }
 
 #[get("/switch")]
@@ -64,12 +62,12 @@ pub fn switch_route() -> RawJson<String> {
 fn refresh_route() -> RawJson<String> {
     let initial_setup = setup();
     match initial_setup {
-        Ok(initial_setup) => RawJson(json!( {"Refreshed": true}).to_string()),
-        Err(error) => RawJson(json!( {"Refreshed": false}).to_string()),
+        Ok(..) => RawJson(json!( {"Refreshed": true}).to_string()),
+        Err(..) => RawJson(json!( {"Refreshed": false}).to_string()),
     }
 }
 
-#[get("/getPresets")]
+#[get("/preset/getPresets")]
 fn get_presets_route() -> RawJson<String> {
     let mut result: Vec<Value> = Vec::new();
     unsafe {
@@ -80,18 +78,24 @@ fn get_presets_route() -> RawJson<String> {
     RawJson(serde_json::to_string(&result).expect("Penis"))
 }
 
-#[get("/setPreset/<preset_name>")]
+#[get("/preset/getPresetNames")]
+fn get_preset_names_route() -> RawJson<String> {
+    let mut result: Vec<String> = Vec::new();
+    unsafe {
+        for preset in PRESETS.lock().expect("Error getting global PRESETS").iter() {
+            result.push(preset.name.to_string());
+        }
+    }
+
+    RawJson(serde_json::to_string(&result).expect("Penis"))
+}
+
+#[get("/preset/setPreset/<preset_name>")]
 fn set_preset_route(preset_name: String) -> RawJson<String> {
     let mut found = false;
     unsafe {
         for pres in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            println!(
-                "{} {} {}",
-                pres.name.to_lowercase() == preset_name.to_lowercase(),
-                pres.name.to_lowercase(),
-                preset_name.to_lowercase()
-            );
-            if (pres.name.to_lowercase() == preset_name.to_lowercase()) {
+            if pres.name.to_lowercase() == preset_name.to_lowercase() {
                 set_preset(pres);
                 found = true;
                 break;
@@ -107,21 +111,32 @@ fn set_preset_route(preset_name: String) -> RawJson<String> {
 
 #[get("/setRelay/<relay_name>/<value>")]
 fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
-    let mut found = false;
     let result = set_relay(&relay_name, &value);
 
     match result {
-        Ok(result) => RawJson(json!( {"RelaySet": true}).to_string()),
+        Ok(result) => RawJson(json!( {"RelaySet": result}).to_string()),
         Err(error) => {
-            RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string())
+            RawJson(json!( {"Error": format!("Could not find preset name in presets {}", error)}).to_string())
         }
     }
 }
 
 fn set_preset(preset: &Preset) {
-    println!("{:?}", preset.relays);
-    for (rel, value) in preset.relays.iter() {
-        set_relay(rel, value);
+    unsafe {
+        let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
+        for relay in relays.iter_mut() {
+            let rel = preset.relays.get_key_value(&relay.name);
+            match rel {
+                Some(temp) => {
+                    let (_, &value) = temp;
+                    if value { relay.turn_on().expect("Can't Connect to Plug"); } else { relay.turn_on().expect("Can't Connect to Plug"); }
+                }
+                None => {
+                    println!("Not found relay {}", relay.name);
+                    let _ = relay.turn_off().expect("Can't Connect to Plug");
+                }
+            }
+        }
     }
 }
 
@@ -130,7 +145,7 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
     unsafe {
         let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
         for relay in relays.iter_mut() {
-            if (relay.name.to_lowercase() == relay_name.to_lowercase()) {
+            if relay.name.to_lowercase() == relay_name.to_lowercase() {
                 found = true;
                 match value {
                     true => {
@@ -150,6 +165,24 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
     }
 }
 
+
+fn get_status() -> Result<Value, Error> {
+    let mut result: Value = json!({});
+    let mut relays: Vec<Value> = Vec::new();
+    let mut rooms: HashSet<String> = HashSet::new();
+    unsafe {
+        for relay in RELAYS.lock().expect("Error getting global RELAYS").iter() {
+            relays.push(relay.to_json());
+            rooms.insert(relay.room.clone());
+        }
+    }
+
+    result["relays"] = Value::Array(relays);
+    result["rooms"] = Value::Array(rooms.into_iter().map(Value::String).collect());
+
+    Ok(result)
+}
+
 fn setup() -> Result<bool, Error> {
     let config = load_config()?;
 
@@ -161,24 +194,52 @@ fn setup() -> Result<bool, Error> {
     Ok(true)
 }
 
+
+pub struct Cors;
+
+#[rocket::async_trait]
+impl Fairing for Cors {
+    fn info(&self) -> Info {
+        Info {
+            name: "Cross-Origin-Resource-Sharing Fairing",
+            kind: Kind::Response,
+        }
+    }
+
+    async fn on_response<'r>(&self, _request: &'r Request<'_>, response: &mut Response<'r>) {
+        response.set_header(Header::new("Access-Control-Allow-Origin", "*"));
+        response.set_header(Header::new(
+            "Access-Control-Allow-Methods",
+            "POST, PATCH, PUT, DELETE, HEAD, OPTIONS, GET",
+        ));
+        response.set_header(Header::new("Access-Control-Allow-Headers", "*"));
+        response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
+    }
+}
+
 #[launch]
 fn rocket() -> _ {
     let initial_setup = setup();
     match initial_setup {
-        Ok(initial_setup) => {
+        Ok(..) => {
             println!("Initial Setup Successful")
         }
         Err(error) => panic!("{}", format!("Initial setup failed {error}")),
     }
 
-    rocket::build().mount(
-        "/",
-        routes![
+    rocket::build()
+        .attach(Cors)
+        .mount(
+            "/",
+            routes![
             index_state,
             status_route,
             switch_route,
+            refresh_route,
             get_presets_route,
-            set_preset_route
+            set_preset_route,
+            get_preset_names_route,
+            set_relay_route
         ],
-    )
+        )
 }

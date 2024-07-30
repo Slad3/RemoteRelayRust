@@ -1,11 +1,7 @@
 use crate::models;
-use std::collections::HashMap;
-
-use rocket::tokio::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, json, Value};
-use std::error;
+use serde_json::{from_str};
 use std::fs;
 
 use models::presets::Preset;
@@ -24,7 +20,7 @@ pub struct Config {
 }
 
 pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
-    let data = fs::read_to_string("src/../config.json")?;
+    let data = fs::read_to_string("config.json")?;
 
     let configuration = from_str(data.as_str())?;
     Ok(configuration)
@@ -34,7 +30,7 @@ fn load_relays(from_config: Vec<Relay>) -> Vec<KasaPlug> {
     let mut relays: Vec<KasaPlug> = Vec::new();
 
     for relay in from_config {
-        if (relay.relay_type == "KasaPlug") {
+        if relay.relay_type == "KasaPlug" {
             let mut plug = KasaPlug::new(relay.ip, relay.name, relay.room);
 
             let connected = plug.connected();
@@ -44,7 +40,7 @@ fn load_relays(from_config: Vec<Relay>) -> Vec<KasaPlug> {
                     let _ = plug.get_status();
                     relays.push(plug);
                 }
-                Err(error) => println!("Unable to connnect {}", plug.name),
+                Err(error) => error!("Unable to connnect {} {}", plug.name, error),
             }
         }
     }

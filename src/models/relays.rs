@@ -53,8 +53,8 @@ impl KasaPlug {
     }
 
     pub fn new(ip: String, name: String, room: String) -> Self {
-        let mut tags: Vec<String> = Vec::new();
-        let mut plug = KasaPlug {
+        let tags: Vec<String> = Vec::new();
+        let plug = KasaPlug {
             ip,
             name,
             status: false,
@@ -93,7 +93,7 @@ impl KasaPlug {
         let result = self.send(cmd.to_string());
         match result {
             Ok(result) => Ok(result["system"]["get_sysinfo"].clone()),
-            Err(result) => Err(Error::new(
+            Err(..) => Err(Error::new(
                 ErrorKind::ConnectionRefused,
                 "Can't Connect To Plug".to_string(),
             )),
@@ -133,7 +133,7 @@ impl KasaPlug {
                 self.status = relay_state;
                 Ok(relay_state)
             }
-            Err(error) => Err(Error::new(
+            Err(..) => Err(Error::new(
                 ErrorKind::ConnectionRefused,
                 "Can't Connect To Plug".to_string(),
             )),
@@ -144,11 +144,11 @@ impl KasaPlug {
         let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
         let result = self.send(cmd.to_string());
         match result {
-            Ok(result) => {
+            Ok(..) => {
                 self.status = false;
                 Ok(true)
             }
-            Err(error) => Err(Error::new(
+            Err(..) => Err(Error::new(
                 ErrorKind::ConnectionRefused,
                 "Can't Connect To Plug".to_string(),
             )),
@@ -159,11 +159,11 @@ pub fn turn_on(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
         let result = self.send(cmd.to_string());
         match result {
-            Ok(result) => {
+            Ok(..) => {
                 self.status = true;
                 Ok(true)
             }
-            Err(error) => Err(Error::new(
+            Err(..) => Err(Error::new(
                 ErrorKind::ConnectionRefused,
                 "Can't Connect To Plug".to_string(),
             )),
