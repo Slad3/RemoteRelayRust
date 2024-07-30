@@ -1,7 +1,7 @@
 use crate::models;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str};
+use serde_json::from_str;
 use std::fs;
 
 use models::presets::Preset;

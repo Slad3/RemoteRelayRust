@@ -155,7 +155,7 @@ impl KasaPlug {
         }
     }
 
-pub fn turn_on(&mut self) -> Result<bool, Error> {
+    pub fn turn_on(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
         let result = self.send(cmd.to_string());
         match result {

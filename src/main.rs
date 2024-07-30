@@ -13,10 +13,10 @@ use serde_json::{json, Value};
 use models::presets::Preset;
 use models::relays::KasaPlug;
 
-use rocket::{Request, Response};
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::Header;
-use rocket::response::content::{RawJson};
+use rocket::response::content::RawJson;
+use rocket::{Request, Response};
 
 use utils::local_config_utils::load_config;
 
@@ -36,9 +36,7 @@ fn status_route() -> RawJson<String> {
     let status: Result<Value, Error> = get_status();
 
     match status {
-        Ok(result) => {
-            RawJson(result.to_string())
-        }
+        Ok(result) => RawJson(result.to_string()),
         Err(error) => {
             RawJson(json!( {"Error": format!("Could not get status {}", error)}).to_string())
         }
@@ -115,9 +113,10 @@ fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
 
     match result {
         Ok(result) => RawJson(json!( {"RelaySet": result}).to_string()),
-        Err(error) => {
-            RawJson(json!( {"Error": format!("Could not find preset name in presets {}", error)}).to_string())
-        }
+        Err(error) => RawJson(
+            json!( {"Error": format!("Could not find preset name in presets {}", error)})
+                .to_string(),
+        ),
     }
 }
 
@@ -129,7 +128,11 @@ fn set_preset(preset: &Preset) {
             match rel {
                 Some(temp) => {
                     let (_, &value) = temp;
-                    if value { relay.turn_on().expect("Can't Connect to Plug"); } else { relay.turn_on().expect("Can't Connect to Plug"); }
+                    if value {
+                        relay.turn_on().expect("Can't Connect to Plug");
+                    } else {
+                        relay.turn_on().expect("Can't Connect to Plug");
+                    }
                 }
                 None => {
                     println!("Not found relay {}", relay.name);
@@ -165,7 +168,6 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
     }
 }
 
-
 fn get_status() -> Result<Value, Error> {
     let mut result: Value = json!({});
     let mut relays: Vec<Value> = Vec::new();
@@ -193,7 +195,6 @@ fn setup() -> Result<bool, Error> {
 
     Ok(true)
 }
-
 
 pub struct Cors;
 
@@ -227,11 +228,9 @@ fn rocket() -> _ {
         Err(error) => panic!("{}", format!("Initial setup failed {error}")),
     }
 
-    rocket::build()
-        .attach(Cors)
-        .mount(
-            "/",
-            routes![
+    rocket::build().attach(Cors).mount(
+        "/",
+        routes![
             index_state,
             status_route,
             switch_route,
@@ -241,5 +240,5 @@ fn rocket() -> _ {
             get_preset_names_route,
             set_relay_route
         ],
-        )
+    )
 }
