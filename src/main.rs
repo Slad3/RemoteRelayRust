@@ -108,7 +108,7 @@ fn set_preset_route(preset_name: String) -> RawJson<String> {
     }
 }
 
-#[get("/relay/setRelay/<relay_name>/<value>")]
+#[get("/relay/<relay_name>/set/<value>")]
 fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
     let result = set_relay(&relay_name, &value);
 
@@ -121,7 +121,7 @@ fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
     }
 }
 
-#[get("/relay/switch/<relay_name>/<value>")]
+#[get("/relay/<relay_name>/switch/<value>")]
 fn switch_relay_route(relay_name: String, value: bool) -> RawJson<String> {
     let relay_status = get_relay(&relay_name)?;
 

@@ -66,10 +66,10 @@ As of this current version, by default presets will turn off every relay not exp
 | /preset/setPreset/<preset_name> | Sets preset via name                             |
 
 ### Relay Routes
-| Route                                | Description                          |
-|--------------------------------------|--------------------------------------|
-| /relay/setRelay/<relay_name>/<value> | Sets relay to specified boolean value |
-| /relay/switch/<relay_name>/<value>   | Switches Relay value                 |
+| Route                              | Description                          |
+|------------------------------------|--------------------------------------|
+| /relay/<relay_name>/set/<value>    | Sets relay to specified boolean value |
+| /relay/<relay_name>/switch/<value> | Switches Relay value                 |
 
 
 ## Future Todos
