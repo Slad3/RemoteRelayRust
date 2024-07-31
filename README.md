@@ -47,3 +47,36 @@ An example configuration will look like this:
 ```
 
 As of this current version, by default presets will turn off every relay not explicitly stated to be turned on (set to `true`) in the preset config. Future efforts will be made toward an `explicit` boolean option per presets to let the user define if they want that preset to explicitly control all relays on preset toggle.
+
+
+## Routes
+### Index Routes
+| Route    | Description                                                                                      |
+|----------|--------------------------------------------------------------------------------------------------|
+| /        | Health Check                                                                                     |
+| /status  | Gets full status of all relays                                                                   |
+| /switch  | Switches all configured relays, mostly for testing                                               |
+| /refresh | Endpoint for refreshing config, useful for dynamic config loading testing and external debugging |
+
+### Preset Routes
+| Route                           | Description                                      |
+|---------------------------------|--------------------------------------------------|
+| /preset/getPresets              | Gets full json structure of presets              |
+| /preset/getPresetNames          | Gets list of all preset names                    |
+| /preset/setPreset/<preset_name> | Sets preset via name                             |
+
+### Relay Routes
+| Route                                | Description                          |
+|--------------------------------------|--------------------------------------|
+| /relay/setRelay/<relay_name>/<value> | Sets relay to specified boolean value |
+| /relay/switch/<relay_name>/<value>   | Switches Relay value                 |
+
+
+## Future Todos
+
+- Find and build better way to centralize `PRESETS` and `RELAYS` in a thread safe way
+    - Move designated presets and relay routes into respective route modules
+    - Move designated preset and relay read/write functions into respecive modules
+- Build API Response struct for better api response handing
+- Add MongoDB config support
+- Add background thread for dynamically loading and detecting relays from config

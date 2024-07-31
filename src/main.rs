@@ -19,6 +19,7 @@ use rocket::response::content::RawJson;
 use rocket::{Request, Response};
 
 use utils::local_config_utils::load_config;
+use crate::models::relays::Relay;
 
 #[macro_use]
 extern crate rocket;
@@ -107,7 +108,7 @@ fn set_preset_route(preset_name: String) -> RawJson<String> {
     }
 }
 
-#[get("/setRelay/<relay_name>/<value>")]
+#[get("/relay/setRelay/<relay_name>/<value>")]
 fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
     let result = set_relay(&relay_name, &value);
 
@@ -119,6 +120,22 @@ fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
         ),
     }
 }
+
+#[get("/relay/switch/<relay_name>/<value>")]
+fn switch_relay_route(relay_name: String, value: bool) -> RawJson<String> {
+    let relay_status = get_relay(&relay_name)?;
+
+    let result = relay_status.switch();
+    
+    match result {
+        Ok(result) => RawJson(json!( {"RelaySet": result}).to_string()),
+        Err(error) => RawJson(
+            json!( {"Error": format!("Could not find preset name in presets {}", error)})
+                .to_string(),
+        ),
+    }
+}
+
 
 fn set_preset(preset: &Preset) {
     unsafe {
@@ -166,6 +183,20 @@ fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
         true => Ok(true),
         false => Err(Error::new(ErrorKind::Other, "Can't find Relay".to_string())),
     }
+}
+
+
+fn get_relay(relay_name: &String) -> Result<&mut KasaPlug, Error> {
+    unsafe {
+        let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
+        for relay in relays.iter_mut() {
+            if relay.name.to_lowercase() == relay_name.to_lowercase() {
+                return Ok(relay);
+            }
+        }
+    }
+
+    Err(Error::new(ErrorKind::Other, "Can't find Relay".to_string()))
 }
 
 fn get_status() -> Result<Value, Error> {
