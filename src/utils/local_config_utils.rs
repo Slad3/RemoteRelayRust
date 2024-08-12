@@ -1,11 +1,11 @@
-use crate::models;
+
+use std::collections::HashMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::fs;
-
-use models::presets::Preset;
-use models::relays::{KasaPlug, Relay};
+use crate::models::presets::Preset;
+use crate::models::relays::{KasaPlug, Relay};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoadedConfig {
@@ -15,8 +15,8 @@ pub struct LoadedConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
-    pub(crate) relays: Vec<KasaPlug>,
-    pub(crate) presets: Vec<Preset>,
+    pub(crate) relays: HashMap<String, KasaPlug>,
+    pub(crate) presets: HashMap<String, Preset>,
 }
 
 pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
@@ -26,8 +26,8 @@ pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
     Ok(configuration)
 }
 
-fn load_relays(from_config: Vec<Relay>) -> Vec<KasaPlug> {
-    let mut relays: Vec<KasaPlug> = Vec::new();
+fn load_relays(from_config: Vec<Relay>) -> HashMap<String, KasaPlug> {
+    let mut relays: HashMap<String, KasaPlug> = HashMap::new();
 
     for relay in from_config {
         if relay.relay_type == "KasaPlug" {
@@ -38,9 +38,9 @@ fn load_relays(from_config: Vec<Relay>) -> Vec<KasaPlug> {
             match connected {
                 Ok(_) => {
                     let _ = plug.get_status();
-                    relays.push(plug);
+                    relays.insert(plug.name.clone(), plug);
                 }
-                Err(error) => error!("Unable to connnect {} {}", plug.name, error),
+                Err(error) => rocket::log::private::error!("Unable to connnect {} {}", plug.name, error),
             }
         }
     }
@@ -48,14 +48,14 @@ fn load_relays(from_config: Vec<Relay>) -> Vec<KasaPlug> {
     relays
 }
 
-fn load_presets(from_config: Vec<Preset>) -> Vec<Preset> {
-    let mut presets: Vec<Preset> = Vec::new();
+fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
+    let mut presets: HashMap<String, Preset> = HashMap::new();
     for i in from_config {
-        presets.push(Preset {
+        presets.insert(i.name.clone(), Preset {
             name: i.name,
             enabled: false,
             relays: i.relays,
-        })
+        });
     }
 
     presets
@@ -64,8 +64,8 @@ fn load_presets(from_config: Vec<Preset>) -> Vec<Preset> {
 pub fn load_config() -> Result<Config, std::io::Error> {
     let loaded_config = load_config_from_file()?;
 
-    let relays: Vec<KasaPlug> = load_relays(loaded_config.relays);
-    let presets: Vec<Preset> = load_presets(loaded_config.presets);
+    let relays: HashMap<String, KasaPlug> = load_relays(loaded_config.relays);
+    let presets: HashMap<String, Preset> = load_presets(loaded_config.presets);
     Ok(Config { relays, presets })
 }
 
