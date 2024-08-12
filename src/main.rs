@@ -20,7 +20,7 @@ use rocket::{Request, Response};
 use models::presets::{set_preset, Preset};
 use models::relays::Relay;
 use utils::local_config_utils::load_config;
-use utils::ThreadHandling::{setup_data_thread, ThreadPackage};
+use utils::thread_handling::{setup_data_thread, ThreadPackage};
 
 #[macro_use]
 extern crate rocket;

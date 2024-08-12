@@ -5,8 +5,8 @@ use crate::models::presets::{set_preset, Preset};
 use crate::models::relays::KasaPlug;
 use crate::utils::local_config_utils::load_config;
 use std::io::Error;
-use std::sync::mpsc::{Receiver, SendError, Sender};
-use std::sync::{mpsc, Mutex};
+use std::sync::mpsc::{Receiver, SendError};
+use std::sync::{Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 
