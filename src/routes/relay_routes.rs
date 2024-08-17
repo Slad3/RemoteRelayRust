@@ -1,12 +1,10 @@
 use crate::utils::thread_handling::{
-    handle_command_input, unwrap_response, RelayCommand, RelayCommands, ThreadCommand::Relay,
-    ThreadPackage, ThreadResponse,
-};
+    handle_command_input, unwrap_response, RelayCommand, ThreadCommand::Relay,
+    ThreadPackage};
 use crate::Channels;
 use rocket::response::content::RawJson;
 use rocket::State;
 use serde_json::json;
-use std::process::Command;
 use std::sync::mpsc::{self, Receiver, Sender};
 
 #[get("/relay/<relay_name>/<command_input>")]

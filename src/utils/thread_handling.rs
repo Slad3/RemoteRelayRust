@@ -6,8 +6,8 @@ use crate::models::relays::KasaPlug;
 use crate::utils::local_config_utils::load_config;
 use rocket::response::content::RawJson;
 use serde_json::{json, Value};
-use std::io::{Error, ErrorKind};
-use std::sync::mpsc::{Receiver, SendError, Sender};
+use std::io::{Error};
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
@@ -54,24 +54,6 @@ pub(crate) enum RelayCommands {
     FALSE,
     SWITCH,
     STATUS,
-}
-
-pub(crate) fn handle_send(result: Result<(), SendError<ThreadPackage>>) {
-    match result {
-        Err(error) => {
-            println!("{}", error.to_string())
-        }
-        _ => {}
-    }
-}
-
-pub(crate) fn handle_received(thread_name: &str, received: ThreadPackage) {
-    match received {
-        ThreadPackage::ThreadCommand(rec) => {
-            println!("{thread_name}:\t{:?}", rec);
-        }
-        _ => {}
-    }
 }
 
 pub(crate) fn handle_command_input(input: String) -> Option<RelayCommands> {

@@ -2,7 +2,6 @@ mod models;
 mod routes;
 mod utils;
 
-use std::collections::HashSet;
 use std::io::{Error, ErrorKind};
 use std::string::ToString;
 use std::sync::mpsc::{Receiver, Sender};

@@ -1,12 +1,9 @@
 use crate::utils::thread_handling::ThreadCommand::Preset;
-use crate::utils::thread_handling::{
-    PresetCommand, RelayCommand, RelayCommands, ThreadCommand::Relay, ThreadPackage, ThreadResponse,
-};
+use crate::utils::thread_handling::{PresetCommand, ThreadPackage, ThreadResponse};
 use crate::Channels;
 use rocket::response::content::RawJson;
 use rocket::State;
 use serde_json::json;
-use std::sync::mpsc::{self, Receiver, Sender};
 
 #[get("/preset/set/<preset_name>")]
 pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) -> RawJson<String> {

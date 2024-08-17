@@ -1,4 +1,4 @@
-use crate::models::relays::{KasaPlug, Relay};
+use crate::models::relays::{KasaPlug};
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
