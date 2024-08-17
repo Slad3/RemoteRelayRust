@@ -1,24 +1,33 @@
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
-use crate::models::presets::{set_preset, Preset};
+use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::KasaPlug;
 use crate::utils::local_config_utils::load_config;
+use rocket::outcome::Outcome::Error;
+use rocket::response::content::RawJson;
+use serde_json::{json, Value};
 use std::io::Error;
-use std::sync::mpsc::{Receiver, SendError};
-use std::sync::{Mutex};
+use std::sync::mpsc::{Receiver, SendError, Sender};
+use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 // pub(crate) enum ThreadResponse {
 pub(crate) enum ThreadPackage {
     ThreadCommand(ThreadCommand),
-    Response,
+    Response(ThreadResponse),
 }
 
-#[derive(Debug)]
-enum ThreadCommand {
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) enum ThreadResponse {
+    Value(Value),
+    Bool(bool),
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) enum ThreadCommand {
     Status,
     Switch,
     AllOff,
@@ -26,19 +35,21 @@ enum ThreadCommand {
     Preset(PresetCommand),
 }
 
-#[derive(Debug)]
-struct RelayCommand {
-    name: String,
-    command: RelayCommands,
-}
-
-#[derive(Debug)]
-struct PresetCommand {
-    name: String,
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) struct RelayCommand {
+    pub(crate) name: String,
+    pub(crate) command: RelayCommands,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-enum RelayCommands {
+pub(crate) enum PresetCommand {
+    Set(String),
+    Names,
+    CurrentPreset,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub(crate) enum RelayCommands {
     #[serde(rename = "true")]
     TRUE,
     FALSE,
@@ -46,7 +57,7 @@ enum RelayCommands {
     STATUS,
 }
 
-fn handle_send(result: Result<(), SendError<ThreadPackage>>) {
+pub(crate) fn handle_send(result: Result<(), SendError<ThreadPackage>>) {
     match result {
         Err(error) => {
             println!("{}", error.to_string())
@@ -55,7 +66,7 @@ fn handle_send(result: Result<(), SendError<ThreadPackage>>) {
     }
 }
 
-fn handle_received(thread_name: &str, received: ThreadPackage) {
+pub(crate) fn handle_received(thread_name: &str, received: ThreadPackage) {
     match received {
         ThreadPackage::ThreadCommand(rec) => {
             println!("{thread_name}:\t{:?}", rec);
@@ -64,66 +75,114 @@ fn handle_received(thread_name: &str, received: ThreadPackage) {
     }
 }
 
-fn handle_command_string(input: &str) -> Option<RelayCommands> {
-    match input {
+pub(crate) fn handle_command_input(input: String) -> Option<RelayCommands> {
+    match input.to_uppercase().as_str() {
         "TRUE" => Option::from(RelayCommands::TRUE),
         "FALSE" => Option::from(RelayCommands::FALSE),
         "SWITCH" => Option::from(RelayCommands::SWITCH),
         "STATUS" => Option::from(RelayCommands::STATUS),
-        _ => Option::None,
+        "ON" => Option::from(RelayCommands::TRUE),
+        "OFF" => Option::from(RelayCommands::FALSE),
+        _ => None,
     }
 }
+
+pub(crate) fn unwrap_response(package: ThreadPackage) -> RawJson<String> {
+    match package {
+        ThreadPackage::Response(ref response) => {
+            RawJson(json!( {"RelaySet": response}).to_string())
+        }
+        _ => RawJson(json!( {"Error": ""}).to_string()),
+    }
+}
+
 fn handle_command(
     received: ThreadPackage,
     relays: &Mutex<HashMap<String, KasaPlug>>,
     presets: &Mutex<HashMap<String, Preset>>,
-) -> Result<bool, Error> {
+) -> Result<ThreadResponse, Error> {
+    println!("{:?}", received);
     match received {
         ThreadPackage::ThreadCommand(command) => match command {
             ThreadCommand::Relay(relay_command) => {
-                println!("Relay Command:\t{:?}", relay_command);
-
                 if let Some(mut relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
                     match relay_command.command {
-                        RelayCommands::SWITCH => relay.switch(),
-                        RelayCommands::TRUE => relay.turn_on(),
-                        RelayCommands::FALSE => relay.turn_off(),
-                        RelayCommands::STATUS => relay.get_status(),
+                        RelayCommands::SWITCH => Ok(ThreadResponse::Bool(relay.switch()?)),
+                        RelayCommands::TRUE => Ok(ThreadResponse::Bool(relay.turn_on()?)),
+                        RelayCommands::FALSE => Ok(ThreadResponse::Bool(relay.turn_off()?)),
+                        RelayCommands::STATUS => Ok(ThreadResponse::Bool(relay.get_status()?)),
                     }
                 } else {
-                    Ok(false)
+                    Ok(ThreadResponse::Bool(false))
                 }
             }
-            ThreadCommand::Preset(preset_command) => {
-                println!("Preset_command:\t{:?}", preset_command);
-                if let Some(mut preset) = presets.lock().unwrap().get_mut(&preset_command.name) {
-                    let _ = set_preset(&preset.name, presets, relays);
-                    Ok(true)
-                } else {
-                    Ok(false)
+            ThreadCommand::Preset(preset_command) => match preset_command {
+                PresetCommand::Names => match get_preset_names(presets) {
+                    Ok(response) => Ok(ThreadResponse::Value(Value::Array(response))),
+                    Err(error) => Err(error),
+                },
+                PresetCommand::Set(preset_name) => {
+                    if let Some(preset) = presets.lock().unwrap().get_mut(&preset_name) {
+                        match set_preset(preset, relays) {
+                            Ok(boolean) => Ok(ThreadResponse::Bool(boolean)),
+                            Err(error) => Err(error),
+                        }
+                    } else {
+                        Ok(ThreadResponse::Bool(false))
+                    }
                 }
-            }
-            ThreadCommand::Status => Ok(true),
-            ThreadCommand::Switch => Ok(true),
-            ThreadCommand::AllOff => Ok(true)
+                _ => Err(Error("Command not implemented yet")),
+            },
+            ThreadCommand::Status => Ok(ThreadResponse::Value(get_status(relays)?)),
+            ThreadCommand::Switch => Ok(ThreadResponse::Bool(true)),
+            ThreadCommand::AllOff => Ok(ThreadResponse::Bool(true)),
         },
-        _ => Ok(true),
+        _ => Ok(ThreadResponse::Bool(true)),
     }
 }
 
-pub(crate) fn setup_data_thread(receiver: Receiver<ThreadPackage>) -> JoinHandle<()> {
+pub(crate) fn get_status(relays: &Mutex<HashMap<String, KasaPlug>>) -> Result<Value, Error> {
+    let mut result: Value = json!({});
+    let mut relay_statuses: Vec<Value> = Vec::new();
+    let mut rooms: HashSet<String> = HashSet::new();
+
+    for (relay_name, relay) in relays.lock().expect("Error getting global RELAYS").iter() {
+        relay_statuses.push(relay.to_json());
+        rooms.insert(relay.room.clone());
+    }
+
+    result["relays"] = Value::Array(relay_statuses);
+    result["rooms"] = Value::Array(rooms.into_iter().map(Value::String).collect());
+
+    Ok(result)
+}
+
+pub(crate) async fn setup_data_thread(
+    sender: Sender<ThreadPackage>,
+    receiver: Receiver<ThreadPackage>,
+) -> JoinHandle<()> {
     let thread = thread::spawn(move || {
         let temp_config = load_config().unwrap();
 
         let relays: Mutex<HashMap<String, KasaPlug>> = Mutex::new(temp_config.relays);
         let presets: Mutex<HashMap<String, Preset>> = Mutex::new(temp_config.presets);
 
+        println!("Relays:");
         for (relay_name, _) in relays.lock().unwrap().iter() {
-            println!("{relay_name}");
+            println!("\t{relay_name}");
+        }
+
+        println!("Presets:");
+        for (preset_name, _) in presets.lock().unwrap().iter() {
+            println!("\t{preset_name}");
         }
 
         for received in receiver {
-            handle_command(received, &relays, &presets).expect("TODO: panic message");
+            let response =
+                handle_command(received, &relays, &presets).expect("TODO: panic message");
+            sender
+                .send(ThreadPackage::Response(response))
+                .expect("TODO: panic message");
         }
     });
     thread

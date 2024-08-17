@@ -1,8 +1,9 @@
+use crate::models::relays::{KasaPlug, Relay};
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+use std::io::Error;
 use std::sync::Mutex;
-use crate::models::relays::{KasaPlug, Relay};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Preset {
@@ -21,36 +22,33 @@ impl Preset {
     }
 }
 
-pub(crate) fn set_preset(preset_name: &String,
-                         presets: &Mutex<HashMap<String, Preset>>,
-                         relays: &Mutex<HashMap<String, KasaPlug>>,
-) {
-    let mut binding = presets.lock().unwrap();
-    let preset = binding.get_mut(preset_name);
-    match preset {
-        Some(preset) => {
-            let mut relays = relays.lock().expect("Error getting global RELAYS");
-            for (relay_name, relay) in relays.iter_mut() {
-                let rel = preset.relays.get_key_value(relay_name);
-                match rel {
-                    Some(temp) => {
-                        let (_, &value) = temp;
-                        if value {
-                            relay.turn_on();
-                        } else {
-                            relay.turn_on();
-                        }
-                    }
-                    None => {
-                        println!("Not found relay {}", relay.name);
-                        relay.turn_off();
-                    }
+pub(crate) fn set_preset(
+    mut preset: &Preset,
+    relays: &Mutex<HashMap<String, KasaPlug>>,
+) -> Result<bool, Error> {
+    let mut relays = relays.lock().expect("Error getting global RELAYS");
+    for (relay_name, relay) in relays.iter_mut() {
+        let rel = preset.relays.get_key_value(relay_name);
+        match rel {
+            Some((_, &value)) => {
+                if value {
+                    relay.turn_on().expect("Couldn't turn on");
+                } else {
+                    relay.turn_on().expect("Couldn't turn off");
                 }
             }
-        }
-        None => {
-            println!("asdfasdfas")
+            None => {
+                relay.turn_off().expect("Couldn't find relay in preset");
+            }
         }
     }
+    Ok(true)
 }
 
+pub(crate) fn get_preset_names(
+    presets: &Mutex<HashMap<String, Preset>>,
+) -> Result<Vec<Value>, Error> {
+    let presets = presets.lock().unwrap();
+    let names: Vec<Value> = presets.keys().map(|key| Value::String(key.clone().to_string())).collect();
+    Ok(names)
+}

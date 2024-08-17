@@ -1,11 +1,10 @@
-
 use std::collections::HashMap;
 
+use crate::models::presets::Preset;
+use crate::models::relays::{KasaPlug, Relay};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::fs;
-use crate::models::presets::Preset;
-use crate::models::relays::{KasaPlug, Relay};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoadedConfig {
@@ -40,7 +39,9 @@ fn load_relays(from_config: Vec<Relay>) -> HashMap<String, KasaPlug> {
                     let _ = plug.get_status();
                     relays.insert(plug.name.clone(), plug);
                 }
-                Err(error) => rocket::log::private::error!("Unable to connnect {} {}", plug.name, error),
+                Err(error) => {
+                    rocket::log::private::error!("Unable to connnect {} {}", plug.name, error)
+                }
             }
         }
     }
@@ -51,11 +52,14 @@ fn load_relays(from_config: Vec<Relay>) -> HashMap<String, KasaPlug> {
 fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
     let mut presets: HashMap<String, Preset> = HashMap::new();
     for i in from_config {
-        presets.insert(i.name.clone(), Preset {
-            name: i.name,
-            enabled: false,
-            relays: i.relays,
-        });
+        presets.insert(
+            i.name.clone(),
+            Preset {
+                name: i.name,
+                enabled: false,
+                relays: i.relays,
+            },
+        );
     }
 
     presets
