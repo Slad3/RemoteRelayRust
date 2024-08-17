@@ -4,10 +4,9 @@ use std::collections::{HashMap, HashSet};
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::KasaPlug;
 use crate::utils::local_config_utils::load_config;
-use rocket::outcome::Outcome::Error;
 use rocket::response::content::RawJson;
 use serde_json::{json, Value};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::mpsc::{Receiver, SendError, Sender};
 use std::sync::Mutex;
 use std::thread;
@@ -45,7 +44,7 @@ pub(crate) struct RelayCommand {
 pub(crate) enum PresetCommand {
     Set(String),
     Names,
-    CurrentPreset,
+    // CurrentPreset,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -131,7 +130,6 @@ fn handle_command(
                         Ok(ThreadResponse::Bool(false))
                     }
                 }
-                _ => Err(Error("Command not implemented yet")),
             },
             ThreadCommand::Status => Ok(ThreadResponse::Value(get_status(relays)?)),
             ThreadCommand::Switch => Ok(ThreadResponse::Bool(true)),
