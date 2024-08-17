@@ -1,28 +1,19 @@
 mod models;
 mod routes;
 mod utils;
-
-use std::io::{Error, ErrorKind};
 use std::string::ToString;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::vec;
 
-use serde_json::{json, Value};
-
-use models::relays::KasaPlug;
+use serde_json::json;
 
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
 use crate::routes::relay_routes::set_relay_command_route;
-use crate::utils::thread_handling::ThreadResponse;
-use models::presets::{set_preset, Preset};
-use models::relays::Relay;
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::{Header, Status};
-use rocket::request::{FromRequest, Outcome};
+use rocket::http::Header;
 use rocket::response::content::RawJson;
 use rocket::{Request, Response};
-use utils::local_config_utils::load_config;
 use utils::thread_handling::{setup_data_thread, ThreadPackage};
 
 #[macro_use]

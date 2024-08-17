@@ -1,6 +1,6 @@
-use crate::models::relays::{KasaPlug};
+use crate::models::relays::KasaPlug;
 use rocket::serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Error;
 use std::sync::Mutex;
@@ -12,18 +12,8 @@ pub struct Preset {
     pub(crate) relays: HashMap<String, bool>,
 }
 
-impl Preset {
-    pub fn to_json(&self) -> Value {
-        json!({
-            "name": &self.name,
-            "enabled": &self.enabled,
-            "relays": &self.relays
-        })
-    }
-}
-
 pub(crate) fn set_preset(
-    mut preset: &Preset,
+    preset: &Preset,
     relays: &Mutex<HashMap<String, KasaPlug>>,
 ) -> Result<bool, Error> {
     let mut relays = relays.lock().expect("Error getting global RELAYS");

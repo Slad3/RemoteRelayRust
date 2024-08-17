@@ -1,11 +1,10 @@
 use crate::utils::thread_handling::{
-    handle_command_input, unwrap_response, RelayCommand, ThreadCommand::Relay,
-    ThreadPackage};
+    handle_command_input, unwrap_response, RelayCommand, ThreadCommand::Relay, ThreadPackage,
+};
 use crate::Channels;
 use rocket::response::content::RawJson;
 use rocket::State;
 use serde_json::json;
-use std::sync::mpsc::{self, Receiver, Sender};
 
 #[get("/relay/<relay_name>/<command_input>")]
 pub(crate) fn set_relay_command_route(
@@ -18,7 +17,7 @@ pub(crate) fn set_relay_command_route(
         None => return RawJson(json!({"Error": "Could not process command"}).to_string()),
     };
 
-    if let Err(error) = channels
+    if let Err(_) = channels
         .route_to_data_sender
         .send(ThreadPackage::ThreadCommand(Relay(RelayCommand {
             name: relay_name.clone(),

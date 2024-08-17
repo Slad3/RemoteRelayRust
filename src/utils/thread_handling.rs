@@ -6,7 +6,7 @@ use crate::models::relays::KasaPlug;
 use crate::utils::local_config_utils::load_config;
 use rocket::response::content::RawJson;
 use serde_json::{json, Value};
-use std::io::{Error};
+use std::io::Error;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
@@ -86,7 +86,7 @@ fn handle_command(
     match received {
         ThreadPackage::ThreadCommand(command) => match command {
             ThreadCommand::Relay(relay_command) => {
-                if let Some(mut relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
+                if let Some(relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
                     match relay_command.command {
                         RelayCommands::SWITCH => Ok(ThreadResponse::Bool(relay.switch()?)),
                         RelayCommands::TRUE => Ok(ThreadResponse::Bool(relay.turn_on()?)),
