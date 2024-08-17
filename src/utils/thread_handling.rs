@@ -144,7 +144,7 @@ pub(crate) fn get_status(relays: &Mutex<HashMap<String, KasaPlug>>) -> Result<Va
     let mut relay_statuses: Vec<Value> = Vec::new();
     let mut rooms: HashSet<String> = HashSet::new();
 
-    for (relay_name, relay) in relays.lock().expect("Error getting global RELAYS").iter() {
+    for (_, relay) in relays.lock().expect("Error getting global RELAYS").iter() {
         relay_statuses.push(relay.to_json());
         rooms.insert(relay.room.clone());
     }

@@ -20,15 +20,20 @@ pub(crate) fn set_relay_command_route(
         None => return RawJson(json!({"Error": "Could not process command"}).to_string()),
     };
 
-    if let Err(error) = channels.route_to_data_sender.send(ThreadPackage::ThreadCommand(Relay(RelayCommand {
-        name: relay_name.clone(),
-        command: command_processed,
-    }))) {
+    if let Err(error) = channels
+        .route_to_data_sender
+        .send(ThreadPackage::ThreadCommand(Relay(RelayCommand {
+            name: relay_name.clone(),
+            command: command_processed,
+        })))
+    {
         return RawJson(json!({"Error": "Could not fetch from data"}).to_string());
     }
 
     match channels.data_to_route_receiver.lock().unwrap().recv() {
         Ok(response) => unwrap_response(response),
-        Err(error) => RawJson(json!({"Error": format!("Could not find relay name in relays {}", error)}).to_string()),
+        Err(error) => RawJson(
+            json!({"Error": format!("Could not find relay name in relays {}", error)}).to_string(),
+        ),
     }
 }

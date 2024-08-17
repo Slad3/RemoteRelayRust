@@ -13,7 +13,8 @@ use serde_json::{json, Value};
 
 use models::relays::KasaPlug;
 
-use crate::routes::relay_routes::{set_relay_command_route};
+use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
+use crate::routes::relay_routes::set_relay_command_route;
 use crate::utils::thread_handling::ThreadResponse;
 use models::presets::{set_preset, Preset};
 use models::relays::Relay;
@@ -24,7 +25,6 @@ use rocket::response::content::RawJson;
 use rocket::{Request, Response};
 use utils::local_config_utils::load_config;
 use utils::thread_handling::{setup_data_thread, ThreadPackage};
-use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
 
 #[macro_use]
 extern crate rocket;
@@ -67,7 +67,6 @@ fn index_state() -> RawJson<String> {
 //         Err(..) => RawJson(json!( {"Refreshed": false}).to_string()),
 //     }
 // }
-
 
 pub struct Cors;
 

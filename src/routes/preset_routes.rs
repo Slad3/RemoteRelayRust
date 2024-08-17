@@ -29,7 +29,11 @@ pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) 
 pub(crate) fn get_preset_names_route(channels: &State<Channels>) -> RawJson<String> {
     let error_message = RawJson(json!({"Error": "Could not get preset names"}).to_string());
 
-    if channels.route_to_data_sender.send(ThreadPackage::ThreadCommand(Preset(PresetCommand::Names))).is_err() {
+    if channels
+        .route_to_data_sender
+        .send(ThreadPackage::ThreadCommand(Preset(PresetCommand::Names)))
+        .is_err()
+    {
         return error_message;
     }
 

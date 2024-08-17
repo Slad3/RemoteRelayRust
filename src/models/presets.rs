@@ -49,6 +49,9 @@ pub(crate) fn get_preset_names(
     presets: &Mutex<HashMap<String, Preset>>,
 ) -> Result<Vec<Value>, Error> {
     let presets = presets.lock().unwrap();
-    let names: Vec<Value> = presets.keys().map(|key| Value::String(key.clone().to_string())).collect();
+    let names: Vec<Value> = presets
+        .keys()
+        .map(|key| Value::String(key.clone().to_string()))
+        .collect();
     Ok(names)
 }
