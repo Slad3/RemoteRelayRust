@@ -19,9 +19,13 @@ pub struct Config {
 }
 
 pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
-    let data = fs::read_to_string("config.json")?;
+    let data = fs::read_to_string("config.json");
 
-    let configuration = from_str(data.as_str())?;
+    if data.is_err() {
+        panic!("Couldn't find 'config.json'")
+    }
+
+    let configuration = from_str(data?.as_str())?;
     Ok(configuration)
 }
 
@@ -93,6 +97,5 @@ mod tests {
     fn test_loading_presetes_formatted_success() {
         let loaded_config = load_config_from_file().expect("Config File Not Found");
         let presets = load_presets(loaded_config.presets);
-        println!("{:?}", &presets);
     }
 }

@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::KasaPlug;
-use crate::utils::local_config_utils::load_config;
+use crate::utils::local_config_utils::{load_config, Config};
 use rocket::response::content::RawJson;
 use serde_json::{json, Value};
 use std::io::Error;
@@ -23,13 +23,13 @@ pub(crate) enum ThreadPackage {
 pub(crate) enum ThreadResponse {
     Value(Value),
     Bool(bool),
+    Error(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub(crate) enum ThreadCommand {
     Status,
-    Switch,
-    AllOff,
+    Refresh,
     Relay(RelayCommand),
     Preset(PresetCommand),
 }
@@ -82,7 +82,6 @@ fn handle_command(
     relays: &Mutex<HashMap<String, KasaPlug>>,
     presets: &Mutex<HashMap<String, Preset>>,
 ) -> Result<ThreadResponse, Error> {
-    println!("{:?}", received);
     match received {
         ThreadPackage::ThreadCommand(command) => match command {
             ThreadCommand::Relay(relay_command) => {
@@ -114,8 +113,7 @@ fn handle_command(
                 }
             },
             ThreadCommand::Status => Ok(ThreadResponse::Value(get_status(relays)?)),
-            ThreadCommand::Switch => Ok(ThreadResponse::Bool(true)),
-            ThreadCommand::AllOff => Ok(ThreadResponse::Bool(true)),
+            ThreadCommand::Refresh => Ok(ThreadResponse::Bool(false)),
         },
         _ => Ok(ThreadResponse::Bool(true)),
     }
@@ -141,11 +139,10 @@ pub(crate) async fn setup_data_thread(
     sender: Sender<ThreadPackage>,
     receiver: Receiver<ThreadPackage>,
 ) -> JoinHandle<()> {
-    let thread = thread::spawn(move || {
-        let temp_config = load_config().unwrap();
-
-        let relays: Mutex<HashMap<String, KasaPlug>> = Mutex::new(temp_config.relays);
-        let presets: Mutex<HashMap<String, Preset>> = Mutex::new(temp_config.presets);
+    let loaded_config = load_config().expect("Could not set up thread");
+    thread::spawn(move || {
+        let mut relays: Mutex<HashMap<String, KasaPlug>> = Mutex::new(loaded_config.relays);
+        let mut presets: Mutex<HashMap<String, Preset>> = Mutex::new(loaded_config.presets);
 
         println!("Relays:");
         for (relay_name, _) in relays.lock().unwrap().iter() {
@@ -158,12 +155,33 @@ pub(crate) async fn setup_data_thread(
         }
 
         for received in receiver {
-            let response =
-                handle_command(received, &relays, &presets).expect("TODO: panic message");
-            sender
-                .send(ThreadPackage::Response(response))
-                .expect("TODO: panic message");
+            println!("{:?}", &received);
+            match received {
+                ThreadPackage::ThreadCommand(ThreadCommand::Refresh) => {
+                    let refresh_loaded_config = load_config();
+                    match refresh_loaded_config {
+                        Ok(config) => {
+                            relays = Mutex::new(config.relays);
+                            presets = Mutex::new(config.presets);
+                            sender
+                                .send(ThreadPackage::Response(ThreadResponse::Bool(true)))
+                                .expect("Channel possibly not open");
+                        }
+                        Err(_) => {
+                            sender
+                                .send(ThreadPackage::Response(ThreadResponse::Bool(false)))
+                                .expect("Channel possibly not open");
+                        }
+                    }
+                }
+                _ => {
+                    let response =
+                        handle_command(received, &relays, &presets).expect("TODO: panic message");
+                    sender
+                        .send(ThreadPackage::Response(response))
+                        .expect("TODO: panic message");
+                }
+            }
         }
-    });
-    thread
+    })
 }

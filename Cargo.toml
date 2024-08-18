@@ -1,5 +1,5 @@
 [package]
-name = "remote_relay_rust"
+name = "RemoteRelayRust"
 version = "0.1.0"
 edition = "2021"
 
