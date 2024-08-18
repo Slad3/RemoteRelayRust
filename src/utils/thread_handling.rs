@@ -155,7 +155,6 @@ pub(crate) async fn setup_data_thread(
         }
 
         for received in receiver {
-            println!("{:?}", &received);
             match received {
                 ThreadPackage::ThreadCommand(ThreadCommand::Refresh) => {
                     let refresh_loaded_config = load_config();
