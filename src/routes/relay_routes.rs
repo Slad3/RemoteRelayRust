@@ -1,6 +1,5 @@
-use crate::utils::thread_handling::{
-    handle_command_input, unwrap_response, RelayCommand, ThreadCommand::Relay, ThreadPackage,
-};
+use crate::models::data_thread_models::{RelayCommand, ThreadCommand::Relay, ThreadPackage};
+use crate::utils::data_thread_handling::{handle_command_input, unwrap_response};
 use crate::Channels;
 
 use crate::models::api_response::ApiResponse;

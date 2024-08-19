@@ -1,6 +1,8 @@
-use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
+use crate::models::data_thread_models::{
+    PresetCommand, RelayCommands, ThreadCommand, ThreadPackage, ThreadResponse,
+};
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::KasaPlug;
 use crate::utils::local_config_utils::load_config;
@@ -12,50 +14,6 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
-
-#[derive(Debug, Serialize, Deserialize)]
-// pub(crate) enum ThreadResponse {
-pub(crate) enum ThreadPackage {
-    ThreadCommand(ThreadCommand),
-    ThreadResponse(ThreadResponse),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum ThreadResponse {
-    Value(Value),
-    Bool(bool),
-    Error(String),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum ThreadCommand {
-    SystemStatus,
-    Refresh,
-    Relay(RelayCommand),
-    Preset(PresetCommand),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct RelayCommand {
-    pub(crate) name: String,
-    pub(crate) command: RelayCommands,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum PresetCommand {
-    Set(String),
-    Names,
-    // CurrentPreset,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum RelayCommands {
-    #[serde(rename = "true")]
-    TRUE,
-    FALSE,
-    SWITCH,
-    STATUS,
-}
 
 pub(crate) fn handle_command_input(input: &str) -> Option<RelayCommands> {
     match input.to_uppercase().as_str() {

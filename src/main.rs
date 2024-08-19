@@ -8,9 +8,12 @@ use std::vec;
 use crate::models::api_response::ApiResponse;
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
 use crate::routes::relay_routes::set_relay_command_route;
-use crate::utils::thread_handling::ThreadCommand::{Refresh, SystemStatus};
-use crate::utils::thread_handling::ThreadResponse;
-use crate::utils::thread_handling::{setup_data_thread, ThreadPackage};
+
+use crate::models::data_thread_models::{
+    ThreadCommand::{Refresh, SystemStatus},
+    ThreadPackage, ThreadResponse,
+};
+use crate::utils::data_thread_handling::setup_data_thread;
 
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{Header, Status};
@@ -111,7 +114,6 @@ struct Channels {
 async fn rocket() -> _ {
     let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<ThreadPackage>();
     let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<ThreadPackage>();
-    // let (data_send, data_receive) = mpsc::channel::<ThreadPackage>();
 
     let channels = Channels {
         route_to_data_sender,

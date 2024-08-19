@@ -1,6 +1,7 @@
 use crate::models::api_response::ApiResponse;
-use crate::utils::thread_handling::ThreadCommand::Preset;
-use crate::utils::thread_handling::{PresetCommand, ThreadPackage, ThreadResponse};
+use crate::models::data_thread_models::{
+    PresetCommand, ThreadCommand::Preset, ThreadPackage, ThreadResponse,
+};
 use crate::Channels;
 use rocket::http::Status;
 use rocket::serde::json::Json;
