@@ -110,14 +110,14 @@ impl KasaPlug {
     }
 
     pub fn to_json(&self) -> Value {
-        return json!({
+        json!({
             "type": "Kasa Plug",
             "ip": &self.ip.to_string(),
             "name": &self.name.to_string(),
             "status": &self.status,
             "room": &self.room.to_string(),
             "tags": &self.tags,
-        });
+        })
     }
 
     pub fn get_status(&mut self) -> Result<bool, Error> {
@@ -140,13 +140,13 @@ impl KasaPlug {
         }
     }
 
-    pub fn turn_off(&mut self) -> Result<bool, Error> {
+    pub fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
         let result = self.send(cmd.to_string());
         match result {
             Ok(..) => {
                 self.status = false;
-                Ok(true)
+                Ok(self.to_json())
             }
             Err(..) => Err(Error::new(
                 ErrorKind::ConnectionRefused,
@@ -155,13 +155,13 @@ impl KasaPlug {
         }
     }
 
-    pub fn turn_on(&mut self) -> Result<bool, Error> {
+    pub fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
         let result = self.send(cmd.to_string());
         match result {
             Ok(..) => {
                 self.status = true;
-                Ok(true)
+                Ok(self.to_json())
             }
             Err(..) => Err(Error::new(
                 ErrorKind::ConnectionRefused,
@@ -170,11 +170,11 @@ impl KasaPlug {
         }
     }
 
-    pub fn switch(&mut self) -> Result<bool, Error> {
-        return match self.status {
+    pub fn switch(&mut self) -> Result<Value, Error> {
+        match self.status {
             true => self.turn_off(),
             false => self.turn_on(),
-        };
+        }
     }
 }
 

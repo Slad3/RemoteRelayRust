@@ -6,33 +6,45 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::vec;
 
-use serde_json::json;
-
+use crate::models::api_response::ApiResponse;
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
 use crate::routes::relay_routes::set_relay_command_route;
-use crate::utils::thread_handling::ThreadCommand::{Preset, Refresh, Status};
+use crate::utils::thread_handling::ThreadCommand::{Preset, Refresh, SystemStatus};
+use crate::utils::thread_handling::{setup_data_thread, ThreadPackage};
 use crate::utils::thread_handling::{PresetCommand, ThreadResponse};
+
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::Header;
+use rocket::http::{ContentType, Header, Status};
 use rocket::response::content::RawJson;
+use rocket::response::status;
+use rocket::serde::json::Json;
 use rocket::{Request, Response, State};
-use utils::thread_handling::{setup_data_thread, ThreadPackage};
+use serde_json::{json, Value};
 
 #[macro_use]
 extern crate rocket;
 
+// #[get("/")]
+// fn index_state() -> Json<Value> {
+//     Json(json!( {"HealthCheck": true}))
+//
+// }
+
 #[get("/")]
-fn index_state() -> RawJson<String> {
-    RawJson(json!( {"HealthCheck": true}).to_string())
+fn index_state() -> ApiResponse {
+    ApiResponse {
+        value: Json(json!( {"HealthCheck": true})),
+        status: Status::Ok,
+    }
 }
 
 #[get("/status")]
-fn status_route(channels: &State<Channels>) -> RawJson<String> {
-    let error_message = RawJson(json!({"Error": "Could not get preset names"}).to_string());
+fn status_route(channels: &State<Channels>) -> Json<Value> {
+    let error_message = Json(json!({"Error": "Could not get preset names"}));
 
     if channels
         .route_to_data_sender
-        .send(ThreadPackage::ThreadCommand(Status))
+        .send(ThreadPackage::ThreadCommand(SystemStatus))
         .is_err()
     {
         return error_message;
@@ -40,16 +52,14 @@ fn status_route(channels: &State<Channels>) -> RawJson<String> {
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
     match res {
-        Ok(ThreadPackage::Response(ThreadResponse::Value(final_response))) => {
-            RawJson(final_response.to_string())
-        }
+        Ok(ThreadPackage::Response(ThreadResponse::Value(final_response))) => Json(final_response),
         _ => error_message,
     }
 }
 
 #[get("/refresh")]
-fn refresh_route(channels: &State<Channels>) -> RawJson<String> {
-    let error_message = RawJson(json!({"Error": "Could not refresh config"}).to_string());
+fn refresh_route(channels: &State<Channels>) -> Json<Value> {
+    let error_message = Json(json!({"Error": "Could not refresh config"}));
 
     if channels
         .route_to_data_sender
@@ -60,10 +70,9 @@ fn refresh_route(channels: &State<Channels>) -> RawJson<String> {
     }
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
-    println!("{:?}", &res);
     match res {
         Ok(ThreadPackage::Response(ThreadResponse::Bool(final_response))) => {
-            RawJson(final_response.to_string())
+            Json(json!({"refresh" : final_response}))
         }
         _ => error_message,
     }
@@ -111,8 +120,6 @@ async fn rocket() -> _ {
     let data_thread = setup_data_thread(data_to_route_sender, route_to_data_receiver);
 
     let _ = data_thread.await.thread();
-
-    println!("Here");
 
     let server = rocket::build().attach(Cors).manage(channels).mount(
         "/",

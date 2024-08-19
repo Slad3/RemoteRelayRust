@@ -1,8 +1,10 @@
 use crate::models::relays::KasaPlug;
+use rocket::http::hyper::body::HttpBody;
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Error;
+
 use std::sync::Mutex;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -32,16 +34,19 @@ pub(crate) fn set_preset(
             }
         }
     }
+
     Ok(true)
 }
 
 pub(crate) fn get_preset_names(
     presets: &Mutex<HashMap<String, Preset>>,
 ) -> Result<Vec<Value>, Error> {
-    let presets = presets.lock().unwrap();
-    let names: Vec<Value> = presets
+    let mut keys: Vec<String> = presets
+        .lock()
+        .unwrap()
         .keys()
-        .map(|key| Value::String(key.clone().to_string()))
+        .map(|key| key.clone().to_string())
         .collect();
-    Ok(names)
+    keys.sort();
+    Ok(keys.into_iter().map(|s| Value::from(s)).collect())
 }
