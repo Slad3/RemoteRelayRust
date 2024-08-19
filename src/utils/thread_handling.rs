@@ -3,9 +3,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::KasaPlug;
-use crate::utils::local_config_utils::{load_config, Config};
-use rocket::http::uri::fmt::UriQueryArgument::Raw;
-use rocket::response::content::RawJson;
+use crate::utils::local_config_utils::load_config;
+
 use rocket::serde::json::Json;
 use serde_json::{json, Value};
 use std::io::Error;
@@ -18,7 +17,7 @@ use std::thread::JoinHandle;
 // pub(crate) enum ThreadResponse {
 pub(crate) enum ThreadPackage {
     ThreadCommand(ThreadCommand),
-    Response(ThreadResponse),
+    ThreadResponse(ThreadResponse),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -72,7 +71,7 @@ pub(crate) fn handle_command_input(input: &str) -> Option<RelayCommands> {
 
 pub(crate) fn unwrap_response(package: ThreadPackage) -> Json<Value> {
     match package {
-        ThreadPackage::Response(ThreadResponse::Value(value)) => Json(value),
+        ThreadPackage::ThreadResponse(ThreadResponse::Value(value)) => Json(value),
         _ => Json(json!( {"Error": ""})),
     }
 }
@@ -81,7 +80,7 @@ fn handle_command(
     received: ThreadPackage,
     relays: &Mutex<HashMap<String, KasaPlug>>,
     presets: &Mutex<HashMap<String, Preset>>,
-    mut current_preset: &Mutex<String>,
+    current_preset: &Mutex<String>,
 ) -> Result<ThreadResponse, Error> {
     match received {
         ThreadPackage::ThreadCommand(command) => match command {
@@ -109,7 +108,7 @@ fn handle_command(
                                 let mut temp_current_preset = current_preset.lock().unwrap();
                                 *temp_current_preset = preset.name.clone().to_string();
                                 Ok(ThreadResponse::Bool(boolean))
-                            },
+                            }
                             Err(error) => Err(error),
                         }
                     } else {
@@ -117,14 +116,20 @@ fn handle_command(
                     }
                 }
             },
-            ThreadCommand::SystemStatus => Ok(ThreadResponse::Value(get_status(relays, current_preset.lock().unwrap().to_string())?)),
+            ThreadCommand::SystemStatus => Ok(ThreadResponse::Value(get_status(
+                relays,
+                current_preset.lock().unwrap().to_string(),
+            )?)),
             ThreadCommand::Refresh => Ok(ThreadResponse::Bool(false)),
         },
         _ => Ok(ThreadResponse::Bool(true)),
     }
 }
 
-pub(crate) fn get_status(relays: &Mutex<HashMap<String, KasaPlug>>, current_preset: String) -> Result<Value, Error> {
+pub(crate) fn get_status(
+    relays: &Mutex<HashMap<String, KasaPlug>>,
+    current_preset: String,
+) -> Result<Value, Error> {
     let mut result: Value = json!({});
     let mut relay_statuses: Vec<Value> = Vec::new();
     let mut rooms: HashSet<String> = HashSet::new();
@@ -170,21 +175,21 @@ pub(crate) async fn setup_data_thread(
                             relays = Mutex::new(config.relays);
                             presets = Mutex::new(config.presets);
                             sender
-                                .send(ThreadPackage::Response(ThreadResponse::Bool(true)))
+                                .send(ThreadPackage::ThreadResponse(ThreadResponse::Bool(true)))
                                 .expect("Channel possibly not open");
                         }
                         Err(_) => {
                             sender
-                                .send(ThreadPackage::Response(ThreadResponse::Bool(false)))
+                                .send(ThreadPackage::ThreadResponse(ThreadResponse::Bool(false)))
                                 .expect("Channel possibly not open");
                         }
                     }
                 }
                 _ => {
-                    let response =
-                        handle_command(received, &relays, &presets, &current_preset).expect("TODO: panic message");
+                    let response = handle_command(received, &relays, &presets, &current_preset)
+                        .expect("TODO: panic message");
                     sender
-                        .send(ThreadPackage::Response(response))
+                        .send(ThreadPackage::ThreadResponse(response))
                         .expect("TODO: panic message");
                 }
             }

@@ -2,35 +2,51 @@ use crate::utils::thread_handling::{
     handle_command_input, unwrap_response, RelayCommand, ThreadCommand::Relay, ThreadPackage,
 };
 use crate::Channels;
+
+use crate::models::api_response::ApiResponse;
+use serde_json::json;
+
+use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::State;
-use serde_json::{json, Value};
 
 #[get("/relay/<relay_name>/<command_input>")]
 pub(crate) fn set_relay_command_route(
     relay_name: &str,
     command_input: &str,
     channels: &State<Channels>,
-) -> Json<Value> {
+) -> ApiResponse {
     let command_processed = match handle_command_input(command_input) {
         Some(command) => command,
-        None => return Json(json!({"Error": "Could not process command"})),
+        None => {
+            return ApiResponse {
+                value: Json(json!({"Error": "Could not process command"})),
+                status: Status::NotAcceptable,
+            }
+        }
     };
 
     if let Err(_) = channels
         .route_to_data_sender
         .send(ThreadPackage::ThreadCommand(Relay(RelayCommand {
-            name: relay_name.clone().parse().unwrap(),
+            name: relay_name.parse().unwrap(),
             command: command_processed,
         })))
     {
-        return Json(json!({"Error": "Could not fetch from data"}));
+        return ApiResponse {
+            value: Json(json!({"Error": "Channel closed"})),
+            status: Status::new(500),
+        };
     }
 
     match channels.data_to_route_receiver.lock().unwrap().recv() {
-        Ok(response) => unwrap_response(response),
-        Err(error) => Json(
-            json!({"Error": format!("Could not find relay name in relays {}", error)}),
-        ),
+        Ok(response) => ApiResponse {
+            value: unwrap_response(response),
+            status: Status::Ok,
+        },
+        Err(error) => ApiResponse {
+            value: Json(json!({"Error": format!("Could not find relay name in relays {}", error)})),
+            status: Status::NotFound,
+        },
     }
 }

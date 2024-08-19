@@ -1,7 +1,6 @@
 mod models;
 mod routes;
 mod utils;
-use std::string::ToString;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::vec;
@@ -9,26 +8,18 @@ use std::vec;
 use crate::models::api_response::ApiResponse;
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
 use crate::routes::relay_routes::set_relay_command_route;
-use crate::utils::thread_handling::ThreadCommand::{Preset, Refresh, SystemStatus};
+use crate::utils::thread_handling::ThreadCommand::{Refresh, SystemStatus};
+use crate::utils::thread_handling::ThreadResponse;
 use crate::utils::thread_handling::{setup_data_thread, ThreadPackage};
-use crate::utils::thread_handling::{PresetCommand, ThreadResponse};
 
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::{ContentType, Header, Status};
-use rocket::response::content::RawJson;
-use rocket::response::status;
+use rocket::http::{Header, Status};
 use rocket::serde::json::Json;
 use rocket::{Request, Response, State};
-use serde_json::{json, Value};
+use serde_json::json;
 
 #[macro_use]
 extern crate rocket;
-
-// #[get("/")]
-// fn index_state() -> Json<Value> {
-//     Json(json!( {"HealthCheck": true}))
-//
-// }
 
 #[get("/")]
 fn index_state() -> ApiResponse {
@@ -39,8 +30,11 @@ fn index_state() -> ApiResponse {
 }
 
 #[get("/status")]
-fn status_route(channels: &State<Channels>) -> Json<Value> {
-    let error_message = Json(json!({"Error": "Could not get preset names"}));
+fn status_route(channels: &State<Channels>) -> ApiResponse {
+    let error_message = ApiResponse {
+        value: Json(json!({"Error": "Could not get preset names"})),
+        status: Status::new(500),
+    };
 
     if channels
         .route_to_data_sender
@@ -52,14 +46,20 @@ fn status_route(channels: &State<Channels>) -> Json<Value> {
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
     match res {
-        Ok(ThreadPackage::Response(ThreadResponse::Value(final_response))) => Json(final_response),
+        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Value(final_response))) => ApiResponse {
+            value: Json(final_response),
+            status: Status::Ok,
+        },
         _ => error_message,
     }
 }
 
 #[get("/refresh")]
-fn refresh_route(channels: &State<Channels>) -> Json<Value> {
-    let error_message = Json(json!({"Error": "Could not refresh config"}));
+fn refresh_route(channels: &State<Channels>) -> ApiResponse {
+    let error_message = ApiResponse {
+        value: Json(json!({"Error": "Could not refresh config"})),
+        status: Status::new(500),
+    };
 
     if channels
         .route_to_data_sender
@@ -71,9 +71,10 @@ fn refresh_route(channels: &State<Channels>) -> Json<Value> {
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
     match res {
-        Ok(ThreadPackage::Response(ThreadResponse::Bool(final_response))) => {
-            Json(json!({"refresh" : final_response}))
-        }
+        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Bool(final_response))) => ApiResponse {
+            value: Json(json!({"refresh" : final_response})),
+            status: Status::Ok,
+        },
         _ => error_message,
     }
 }

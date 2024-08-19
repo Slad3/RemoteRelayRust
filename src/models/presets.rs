@@ -1,5 +1,4 @@
 use crate::models::relays::KasaPlug;
-use rocket::http::hyper::body::HttpBody;
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

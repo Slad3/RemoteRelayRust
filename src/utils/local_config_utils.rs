@@ -65,7 +65,7 @@ fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
             },
         );
     }
-    
+
     if !presets.contains_key("Custom") {
         presets.insert(
             "Custom".parse().unwrap(),
