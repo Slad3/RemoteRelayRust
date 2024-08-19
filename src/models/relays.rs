@@ -13,6 +13,7 @@ pub(crate) struct Relay {
     #[serde(rename = "type")]
     pub(crate) relay_type: String,
     pub(crate) name: String,
+    pub(crate) status: bool,
     pub(crate) ip: String,
     pub(crate) room: String,
 }

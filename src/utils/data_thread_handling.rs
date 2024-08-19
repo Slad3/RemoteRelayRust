@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::models::data_thread_models::{
-    PresetCommand, RelayCommands, ThreadCommand, ThreadPackage, ThreadResponse,
+    PresetCommand, RelayCommand, RelayCommands, ThreadCommand, ThreadPackage, ThreadResponse,
 };
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::KasaPlug;
@@ -34,6 +34,50 @@ pub(crate) fn unwrap_response(package: ThreadPackage) -> Json<Value> {
     }
 }
 
+fn handle_relay_command(
+    relay_command: RelayCommand,
+    relays: &Mutex<HashMap<String, KasaPlug>>,
+) -> Result<ThreadResponse, Error> {
+    if let Some(relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
+        match relay_command.command {
+            RelayCommands::SWITCH => Ok(ThreadResponse::Value(relay.switch()?)),
+            RelayCommands::TRUE => Ok(ThreadResponse::Value(relay.turn_on()?)),
+            RelayCommands::FALSE => Ok(ThreadResponse::Value(relay.turn_off()?)),
+            RelayCommands::STATUS => Ok(ThreadResponse::Bool(relay.get_status()?)),
+        }
+    } else {
+        Ok(ThreadResponse::Bool(false))
+    }
+}
+
+fn handle_preset_command(
+    preset_command: PresetCommand,
+    relays: &Mutex<HashMap<String, KasaPlug>>,
+    presets: &Mutex<HashMap<String, Preset>>,
+    current_preset: &Mutex<String>,
+) -> Result<ThreadResponse, Error> {
+    match preset_command {
+        PresetCommand::Names => match get_preset_names(presets) {
+            Ok(response) => Ok(ThreadResponse::Value(Value::Array(response))),
+            Err(error) => Err(error),
+        },
+        PresetCommand::Set(preset_name) => {
+            if let Some(preset) = presets.lock().unwrap().get_mut(&preset_name) {
+                match set_preset(preset, relays) {
+                    Ok(boolean) => {
+                        let mut temp_current_preset = current_preset.lock().unwrap();
+                        *temp_current_preset = preset.name.clone().to_string();
+                        Ok(ThreadResponse::Bool(boolean))
+                    }
+                    Err(error) => Err(error),
+                }
+            } else {
+                Ok(ThreadResponse::Bool(false))
+            }
+        }
+    }
+}
+
 fn handle_command(
     received: ThreadPackage,
     relays: &Mutex<HashMap<String, KasaPlug>>,
@@ -42,38 +86,10 @@ fn handle_command(
 ) -> Result<ThreadResponse, Error> {
     match received {
         ThreadPackage::ThreadCommand(command) => match command {
-            ThreadCommand::Relay(relay_command) => {
-                if let Some(relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
-                    match relay_command.command {
-                        RelayCommands::SWITCH => Ok(ThreadResponse::Value(relay.switch()?)),
-                        RelayCommands::TRUE => Ok(ThreadResponse::Value(relay.turn_on()?)),
-                        RelayCommands::FALSE => Ok(ThreadResponse::Value(relay.turn_off()?)),
-                        RelayCommands::STATUS => Ok(ThreadResponse::Bool(relay.get_status()?)),
-                    }
-                } else {
-                    Ok(ThreadResponse::Bool(false))
-                }
+            ThreadCommand::Relay(relay_command) => handle_relay_command(relay_command, relays),
+            ThreadCommand::Preset(preset_command) => {
+                handle_preset_command(preset_command, relays, presets, current_preset)
             }
-            ThreadCommand::Preset(preset_command) => match preset_command {
-                PresetCommand::Names => match get_preset_names(presets) {
-                    Ok(response) => Ok(ThreadResponse::Value(Value::Array(response))),
-                    Err(error) => Err(error),
-                },
-                PresetCommand::Set(preset_name) => {
-                    if let Some(preset) = presets.lock().unwrap().get_mut(&preset_name) {
-                        match set_preset(preset, relays) {
-                            Ok(boolean) => {
-                                let mut temp_current_preset = current_preset.lock().unwrap();
-                                *temp_current_preset = preset.name.clone().to_string();
-                                Ok(ThreadResponse::Bool(boolean))
-                            }
-                            Err(error) => Err(error),
-                        }
-                    } else {
-                        Ok(ThreadResponse::Bool(false))
-                    }
-                }
-            },
             ThreadCommand::SystemStatus => Ok(ThreadResponse::Value(get_status(
                 relays,
                 current_preset.lock().unwrap().to_string(),
