@@ -1,4 +1,4 @@
-use crate::models::relays::KasaPlug;
+use crate::models::relays::RelayType;
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -15,7 +15,7 @@ pub struct Preset {
 
 pub(crate) fn set_preset(
     preset: &Preset,
-    relays: &Mutex<HashMap<String, KasaPlug>>,
+    relays: &Mutex<HashMap<String, RelayType>>,
 ) -> Result<bool, Error> {
     let mut relays = relays.lock().expect("Error getting global RELAYS");
     for (relay_name, relay) in relays.iter_mut() {
@@ -23,13 +23,25 @@ pub(crate) fn set_preset(
         match rel {
             Some((_, &value)) => {
                 if value {
-                    relay.turn_on().expect("Couldn't turn on");
+                    match relay {
+                        RelayType::KasaPlug(plug) => plug.turn_on(),
+                        RelayType::KasaMultiPlug(plug) => plug.turn_on(),
+                    }
+                    .expect("Couldn't turn on");
                 } else {
-                    relay.turn_on().expect("Couldn't turn off");
+                    match relay {
+                        RelayType::KasaPlug(plug) => plug.turn_off(),
+                        RelayType::KasaMultiPlug(plug) => plug.turn_off(),
+                    }
+                    .expect("Couldn't turn off");
                 }
             }
             None => {
-                relay.turn_off().expect("Couldn't find relay in preset");
+                match relay {
+                    RelayType::KasaPlug(plug) => plug.turn_off(),
+                    RelayType::KasaMultiPlug(plug) => plug.turn_off(),
+                }
+                .expect("Couldn't turn off");
             }
         }
     }

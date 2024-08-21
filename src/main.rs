@@ -15,6 +15,7 @@ use crate::models::data_thread_models::{
 };
 use crate::utils::data_thread_handling::setup_data_thread;
 
+use crate::utils::load_config::ConfigLocation;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{Header, Status};
 use rocket::serde::json::Json;
@@ -120,7 +121,11 @@ async fn rocket() -> _ {
         data_to_route_receiver: Arc::new(Mutex::new(data_to_route_receiver)),
     };
 
-    let data_thread = setup_data_thread(data_to_route_sender, route_to_data_receiver);
+    let data_thread = setup_data_thread(
+        data_to_route_sender,
+        route_to_data_receiver,
+        ConfigLocation::LOCAL,
+    );
 
     let _ = data_thread.await.thread();
 

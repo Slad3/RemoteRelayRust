@@ -1,21 +1,17 @@
 use std::collections::HashMap;
 
+use crate::models::config_models::Config;
 use crate::models::presets::Preset;
-use crate::models::relays::{KasaPlug, Relay};
+use crate::models::relays::RelayType;
+use crate::models::relays::{ConfigRelayType, KasaMultiPlug, KasaPlug, LocalConfigRelay};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoadedConfig {
-    relays: Vec<Relay>,
+    relays: Vec<LocalConfigRelay>,
     presets: Vec<Preset>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Config {
-    pub(crate) relays: HashMap<String, KasaPlug>,
-    pub(crate) presets: HashMap<String, Preset>,
 }
 
 pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
@@ -29,22 +25,30 @@ pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
     Ok(configuration)
 }
 
-fn load_relays(from_config: Vec<Relay>) -> HashMap<String, KasaPlug> {
-    let mut relays: HashMap<String, KasaPlug> = HashMap::new();
+fn load_relays(from_config: Vec<LocalConfigRelay>) -> HashMap<String, RelayType> {
+    let mut relays: HashMap<String, RelayType> = HashMap::new();
 
     for relay in from_config {
-        if relay.relay_type == "KasaPlug" {
-            let mut plug = KasaPlug::new(relay.ip, relay.name, relay.room);
+        match relay.relay_type {
+            ConfigRelayType::KasaMultiPlug => {
+                let plugs = KasaMultiPlug::new(relay.ip, relay.names, relay.room);
 
-            let connected = plug.connected();
-
-            match connected {
-                Ok(_) => {
-                    let _ = plug.get_status();
-                    relays.insert(plug.name.clone(), plug);
+                for mut plug in plugs {
+                    if plug.connected().is_ok() {
+                        relays.insert(plug.name.clone(), RelayType::KasaMultiPlug(plug));
+                    }
                 }
-                Err(error) => {
-                    rocket::log::private::error!("Unable to connnect {} {}", plug.name, error)
+            }
+            ConfigRelayType::KasaPlug => {
+                let mut plug = KasaPlug::new(relay.ip, relay.name, relay.room);
+                match plug.connected() {
+                    Ok(_) => {
+                        let _ = plug.get_status();
+                        relays.insert(plug.name.clone(), RelayType::KasaPlug(plug));
+                    }
+                    Err(error) => {
+                        rocket::log::private::error!("Unable to connnect {} {}", plug.name, error)
+                    }
                 }
             }
         }
@@ -80,10 +84,10 @@ fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
     presets
 }
 
-pub fn load_config() -> Result<Config, std::io::Error> {
+pub fn load_local_config() -> Result<Config, std::io::Error> {
     let loaded_config = load_config_from_file()?;
 
-    let relays: HashMap<String, KasaPlug> = load_relays(loaded_config.relays);
+    let relays: HashMap<String, RelayType> = load_relays(loaded_config.relays);
     let presets: HashMap<String, Preset> = load_presets(loaded_config.presets);
     Ok(Config { relays, presets })
 }
