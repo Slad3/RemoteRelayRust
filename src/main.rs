@@ -3,7 +3,7 @@ mod routes;
 mod utils;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
-use std::vec;
+use std::{env, vec};
 
 use crate::models::api_response::ApiResponse;
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
@@ -113,6 +113,13 @@ struct Channels {
 
 #[launch]
 async fn rocket() -> _ {
+    let args: Vec<String> = env::args().collect();
+
+    let mut config_location = ConfigLocation::LOCAL;
+    if args.contains(&"MONGO_CONFIG".to_string()) {
+        config_location = ConfigLocation::MONGODB
+    }
+
     let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<ThreadPackage>();
     let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<ThreadPackage>();
 
@@ -124,7 +131,7 @@ async fn rocket() -> _ {
     let data_thread = setup_data_thread(
         data_to_route_sender,
         route_to_data_receiver,
-        ConfigLocation::LOCAL,
+        config_location,
     );
 
     let _ = data_thread.await.thread();

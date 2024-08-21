@@ -81,6 +81,17 @@ fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
         );
     }
 
+    if !presets.contains_key("FullOff") {
+        presets.insert(
+            "FullOff".parse().unwrap(),
+            Preset {
+                name: "FullOff".parse().unwrap(),
+                enabled: false,
+                relays: HashMap::new(),
+            },
+        );
+    }
+
     presets
 }
 
@@ -109,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn test_loading_presetes_formatted_success() {
+    fn test_loading_presets_formatted_success() {
         let loaded_config = load_config_from_file().expect("Config File Not Found");
         let presets = load_presets(loaded_config.presets);
     }

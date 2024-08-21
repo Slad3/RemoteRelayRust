@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use serde_json::json;
 use serde_json::Value;
 use std::convert::TryFrom;
@@ -32,7 +33,7 @@ pub fn encrypt(string: String) -> Vec<u8> {
 
 pub fn send(ip: String, cmd: String) -> Result<Value, Error> {
     const PORT: u16 = 9999;
-    let timeout = 10;
+    let timeout = 1;
     let mut stream = TcpStream::connect((ip.to_string(), PORT))?;
     let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(timeout)));
     let encrypted = encrypt(cmd);

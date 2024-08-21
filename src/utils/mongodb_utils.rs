@@ -1,13 +1,16 @@
 use crate::models::config_models::Config;
-use mongodb::bson::Document;
-use mongodb::Collection;
+use crate::models::presets::Preset;
+use crate::models::relays::{ConfigRelayType, KasaMultiPlug, KasaPlug, MongodbRelay, RelayType};
+use dotenv::dotenv;
 use mongodb::{bson::doc, options::ClientOptions, Client};
+use mongodb::{Collection, Database};
 use rocket::futures::TryStreamExt;
+use std::collections::HashMap;
 use std::env;
 use std::env::VarError;
-use std::io::Error;
 
 fn load_mongo_url() -> Result<String, VarError> {
+    dotenv().ok();
     env::var("MONGODB_URL")
 }
 
@@ -24,37 +27,101 @@ async fn load_mongo_client() -> mongodb::error::Result<Client> {
     Client::with_options(client_options)
 }
 
-async fn mongo_find(
-    collection: Collection<Document>,
-    filter: Document,
-) -> mongodb::error::Result<Vec<Document>> {
-    collection.find(filter).await?.try_collect::<Vec<_>>().await
+async fn find_mongo_relays(
+    database: &Database,
+) -> Result<HashMap<String, RelayType>, mongodb::error::Error> {
+    let relays_collection: Collection<MongodbRelay> = database.collection("Relays");
+    let filter = doc! {};
+    let query_result = relays_collection.find(filter).await;
+
+    let relay_query = query_result?.try_collect::<Vec<_>>().await?;
+
+    let mut relays: HashMap<String, RelayType> = HashMap::new();
+
+    for relay in relay_query {
+        match &relay.relay_type {
+            ConfigRelayType::KasaPlug => {
+                let mut plug =
+                    KasaPlug::new(relay.ip.clone(), relay.name.clone(), relay.room.clone());
+
+                if plug.connected().is_ok() {
+                    relays.insert(plug.name.clone(), RelayType::KasaPlug(plug));
+                }
+            }
+            ConfigRelayType::KasaMultiPlug => {
+                let plugs =
+                    KasaMultiPlug::new(relay.ip.clone(), relay.names.clone(), relay.room.clone());
+
+                for mut plug in plugs {
+                    if plug.connected().is_ok() {
+                        relays.insert(plug.name.clone(), RelayType::KasaMultiPlug(plug));
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(relays)
 }
 
-// async fn load_mongo_config() -> Result<Config, Error> {
-//     let client = load_mongo_client()
-//         .await
-//         .expect("Unable to connect to client");
-//
-//     let home_config = client.database("HomeConfig");
-//
-//     let relays = mongo_find(home_config.collection("Relays"), doc! {})
-//         .await
-//         .expect("Unable to find relays from database");
-//     let presets = mongo_find(home_config.collection("Presets"), doc! {})
-//         .await
-//         .expect("Unable to find presets from database");
-//
-//
-//     // Config { relays, presets }
-// }
+async fn find_mongo_presets(
+    database: &Database,
+) -> Result<HashMap<String, Preset>, mongodb::error::Error> {
+    let presets_collection: Collection<Preset> = database.collection("Presets");
+    let filter = doc! {};
+    let query_result = presets_collection.find(filter).await;
+
+    let preset_query = query_result?.try_collect::<Vec<_>>().await?;
+
+    let mut presets: HashMap<String, Preset> = HashMap::new();
+
+    for preset in preset_query {
+        presets.insert(preset.name.clone(), preset);
+    }
+
+    if !presets.contains_key("Custom") {
+        presets.insert(
+            "Custom".parse().unwrap(),
+            Preset {
+                name: "Custom".parse().unwrap(),
+                enabled: false,
+                relays: HashMap::new(),
+            },
+        );
+    }
+
+    if !presets.contains_key("FullOff") {
+        presets.insert(
+            "FullOff".parse().unwrap(),
+            Preset {
+                name: "FullOff".parse().unwrap(),
+                enabled: false,
+                relays: HashMap::new(),
+            },
+        );
+    }
+
+    Ok(presets)
+}
+
+pub async fn load_mongo_config() -> Result<Config, mongodb::error::Error> {
+    let client = load_mongo_client()
+        .await
+        .expect("Unable to connect to client");
+
+    let home_config = client.database("HomeConfig");
+
+    let relays = find_mongo_relays(&home_config).await?;
+    let presets = find_mongo_presets(&home_config).await?;
+
+    Ok(Config { relays, presets })
+}
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::relays::RelayType::KasaMultiPlug;
-    use crate::models::relays::{KasaPlug, MongodbRelay};
     use dotenv::dotenv;
+    use mongodb::bson::Document;
 
     #[test]
     fn test_loading_mongo_url_from_dotenv() {
@@ -98,42 +165,23 @@ mod tests {
 
         let home_config = client.database("HomeConfig");
 
-        let relays_collection: Collection<MongodbRelay> = home_config.collection("Relays");
-        let filter = doc! {};
-        let query_result = relays_collection.find(filter).await;
-        assert!(query_result.is_ok());
-
-        let relay_query = query_result
-            .unwrap()
-            .try_collect::<Vec<_>>()
+        let relays = find_mongo_relays(&home_config)
             .await
-            .expect("Could not parse Relay Query");
+            .expect("Could not get Mongo relays");
+    }
 
-        // let relays: Vec<KasaPlug> = relay_query
-        //     .iter()
-        //     .filter_map(|relay: &MongodbRelay| match relay.relay_type.as_str() {
-        //         "KasaPlug" => Some(KasaPlug::new(
-        //             relay.ip.clone(),
-        //             relay.name.clone(),
-        //             relay.room.clone(),
-        //         )),
-        //         _ => None,
-        //     })
-        //     .collect();
+    #[tokio::test]
+    async fn test_getting_config_from_mongodb_presets() {
+        dotenv().ok();
+        let client_result = load_mongo_client().await;
+        assert!(client_result.is_ok());
 
-        let relays: Vec<KasaPlug> = relay_query
-            .iter()
-            .filter_map(|relay: &MongodbRelay| match &relay.relay_type {
-                MongodbRelay::KasaPlug => Some(KasaPlug::new(
-                    relay.ip.clone(),
-                    relay.name.clone(),
-                    relay.room.clone(),
-                )),
-                // RelayType::KasaMultiPlug => Some(KasaPlugMulti)
-                _ => None,
-            })
-            .collect();
+        let client = client_result.unwrap();
 
-        // println!("{:?}", relays);
+        let home_config = client.database("HomeConfig");
+
+        let presets = find_mongo_presets(&home_config)
+            .await
+            .expect("Could not get Mongo presets");
     }
 }

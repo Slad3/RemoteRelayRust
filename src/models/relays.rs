@@ -24,7 +24,10 @@ pub enum ConfigRelayType {
 pub(crate) struct MongodbRelay {
     #[serde(rename = "type")]
     pub(crate) relay_type: ConfigRelayType,
+    #[serde(default)]
     pub(crate) name: String,
+    #[serde(default)]
+    pub(crate) names: Vec<String>,
     pub(crate) ip: String,
     pub(crate) room: String,
 }
