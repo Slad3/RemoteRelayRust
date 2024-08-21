@@ -115,9 +115,9 @@ struct Channels {
 async fn rocket() -> _ {
     let args: Vec<String> = env::args().collect();
 
-    let mut config_location = ConfigLocation::LOCAL;
-    if args.contains(&"MONGO_CONFIG".to_string()) {
-        config_location = ConfigLocation::MONGODB
+    let mut config_location = ConfigLocation::MONGODB;
+    if args.contains(&"LOCAL_CONFIG".to_string()) {
+        config_location = ConfigLocation::LOCAL
     }
 
     let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<ThreadPackage>();

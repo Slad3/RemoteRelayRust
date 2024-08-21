@@ -15,15 +15,8 @@ fn load_mongo_url() -> Result<String, VarError> {
 }
 
 async fn load_mongo_client() -> mongodb::error::Result<Client> {
-    let mongodb_url_result = load_mongo_url();
-
-    let mongodb_url = match mongodb_url_result {
-        Err(_) => panic!("Unable to read MONGODB_URL from .env"),
-        Ok(mongodb_url) => mongodb_url,
-    };
-
+    let mongodb_url = load_mongo_url().expect("Unable to read MONGODB_URL from .env");
     let client_options = ClientOptions::parse(&mongodb_url).await?;
-
     Client::with_options(client_options)
 }
 
@@ -33,7 +26,6 @@ async fn find_mongo_relays(
     let relays_collection: Collection<MongodbRelay> = database.collection("Relays");
     let filter = doc! {};
     let query_result = relays_collection.find(filter).await;
-
     let relay_query = query_result?.try_collect::<Vec<_>>().await?;
 
     let mut relays: HashMap<String, RelayType> = HashMap::new();
@@ -79,27 +71,21 @@ async fn find_mongo_presets(
         presets.insert(preset.name.clone(), preset);
     }
 
-    if !presets.contains_key("Custom") {
-        presets.insert(
-            "Custom".parse().unwrap(),
-            Preset {
-                name: "Custom".parse().unwrap(),
-                enabled: false,
-                relays: HashMap::new(),
-            },
-        );
-    }
+    presets
+        .entry("Custom".to_string())
+        .or_insert_with(|| Preset {
+            name: "Custom".to_string(),
+            enabled: false,
+            relays: HashMap::new(),
+        });
 
-    if !presets.contains_key("FullOff") {
-        presets.insert(
-            "FullOff".parse().unwrap(),
-            Preset {
-                name: "FullOff".parse().unwrap(),
-                enabled: false,
-                relays: HashMap::new(),
-            },
-        );
-    }
+    presets
+        .entry("FullOff".to_string())
+        .or_insert_with(|| Preset {
+            name: "FullOff".to_string(),
+            enabled: false,
+            relays: HashMap::new(),
+        });
 
     Ok(presets)
 }

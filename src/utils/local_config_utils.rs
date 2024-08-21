@@ -59,38 +59,25 @@ fn load_relays(from_config: Vec<LocalConfigRelay>) -> HashMap<String, RelayType>
 
 fn load_presets(from_config: Vec<Preset>) -> HashMap<String, Preset> {
     let mut presets: HashMap<String, Preset> = HashMap::new();
-    for i in from_config {
-        presets.insert(
-            i.name.clone(),
-            Preset {
-                name: i.name,
-                enabled: false,
-                relays: i.relays,
-            },
-        );
+    for preset in from_config {
+        presets.insert(preset.name.clone(), preset);
     }
 
-    if !presets.contains_key("Custom") {
-        presets.insert(
-            "Custom".parse().unwrap(),
-            Preset {
-                name: "Custom".parse().unwrap(),
-                enabled: false,
-                relays: HashMap::new(),
-            },
-        );
-    }
+    presets
+        .entry("Custom".to_string())
+        .or_insert_with(|| Preset {
+            name: "Custom".to_string(),
+            enabled: false,
+            relays: HashMap::new(),
+        });
 
-    if !presets.contains_key("FullOff") {
-        presets.insert(
-            "FullOff".parse().unwrap(),
-            Preset {
-                name: "FullOff".parse().unwrap(),
-                enabled: false,
-                relays: HashMap::new(),
-            },
-        );
-    }
+    presets
+        .entry("FullOff".to_string())
+        .or_insert_with(|| Preset {
+            name: "FullOff".to_string(),
+            enabled: false,
+            relays: HashMap::new(),
+        });
 
     presets
 }
