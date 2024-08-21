@@ -140,7 +140,7 @@ pub(crate) fn get_status(
     Ok(result)
 }
 
-pub(crate) async fn setup_data_thread(
+pub(crate) fn setup_data_thread(
     sender: Sender<ThreadPackage>,
     receiver: Receiver<ThreadPackage>,
     config_location: ConfigLocation,

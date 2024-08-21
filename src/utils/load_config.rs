@@ -11,6 +11,16 @@ pub(crate) enum ConfigLocation {
     LOCAL,
 }
 
+impl std::fmt::Display for ConfigLocation {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let location = match *self {
+            ConfigLocation::MONGODB => "MongoDB",
+            ConfigLocation::LOCAL => "Local",
+        };
+        write!(f, "{}", location)
+    }
+}
+
 pub fn load_config(config_location: ConfigLocation) -> Result<Config, Error> {
     match config_location {
         ConfigLocation::MONGODB => {

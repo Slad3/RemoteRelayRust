@@ -28,7 +28,7 @@ pub fn encrypt(string: String) -> Vec<u8> {
 
         result.push(a);
     }
-    return result;
+    result
 }
 
 pub fn send(ip: String, cmd: String) -> Result<Value, Error> {

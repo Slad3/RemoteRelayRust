@@ -120,6 +120,8 @@ async fn rocket() -> _ {
         config_location = ConfigLocation::LOCAL
     }
 
+    println!("Loading config from: {config_location}");
+
     let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<ThreadPackage>();
     let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<ThreadPackage>();
 
@@ -134,7 +136,7 @@ async fn rocket() -> _ {
         config_location,
     );
 
-    let _ = data_thread.await.thread();
+    let _ = data_thread.thread();
 
     let server = rocket::build().attach(Cors).manage(channels).mount(
         "/",

@@ -280,19 +280,5 @@ mod tests {
             .unwrap()
             .turn_on()
             .expect("TODO: panic message");
-
-        // if children.is_array() {
-        //     println!("{:?}", children.get(0));
-        //     for child in children.as_array() {
-        //         println!("Here");
-        //         println!("Child: {:?}", &child);
-        //     }
-        // }
-        //
-        //
-        // let parsed_childred = children.as_array().iter().filter_map(|child| {
-        //     println!("Child: {:?}", &child);
-        //     None::<String>
-        // });
     }
 }
