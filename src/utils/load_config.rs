@@ -15,7 +15,6 @@ pub fn load_config(config_location: ConfigLocation) -> Result<Config, Error> {
     match config_location {
         ConfigLocation::MONGODB => {
             let config = block_on(load_mongo_config());
-            
             match config {
                 Ok(config) => Ok(config),
                 Err(error) => Err(Error::new(ErrorKind::Other, error)),
