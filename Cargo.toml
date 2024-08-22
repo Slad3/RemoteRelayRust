@@ -1,7 +1,13 @@
 [package]
-name = "RemoteRelayRust"
-version = "0.1.0"
+authors = ["Slad3"]
+description = "A new type of shell"
 edition = "2021"
+homepage = "https://github.com/Slad3/RemoteRelayRust"
+license = "MIT"
+name = "remote_relay_rust"
+repository = "https://github.com/Slad3/RemoteRelayRust"
+rust-version = "1.79.0"
+version = "0.2.0"
 
 [dependencies]
 serde_json = { version = "1.0.120", features = [] }
