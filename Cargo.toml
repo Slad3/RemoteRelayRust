@@ -5,9 +5,13 @@ edition = "2021"
 
 [dependencies]
 serde_json = { version = "1.0.120", features = [] }
-rocket = "0.5.1"
+rocket = { version = "0.5.1", features = ["json"] }
 serde = "1.0.204"
 dotenv_codegen = "0.15.0"
+dotenv = "0.15.0"
+tokio = "1.39.1"
+mongodb = "3.0.1"
+futures = "0.3.30"
 
 
 [package.metadata.precommit]

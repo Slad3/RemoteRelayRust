@@ -1,230 +1,86 @@
 mod models;
 mod routes;
 mod utils;
+use std::sync::mpsc::{Receiver, Sender};
+use std::sync::{mpsc, Arc, Mutex};
+use std::{env, vec};
 
-use std::collections::HashSet;
-use std::io::{Error, ErrorKind};
-use std::string::ToString;
-use std::sync::Mutex;
-use std::vec;
+use crate::models::api_response::ApiResponse;
+use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
+use crate::routes::relay_routes::set_relay_command_route;
 
-use serde_json::{json, Value};
+use crate::models::data_thread_models::{
+    ThreadCommand::{Refresh, SystemStatus},
+    ThreadPackage, ThreadResponse,
+};
+use crate::utils::data_thread_handling::setup_data_thread;
 
-use models::presets::Preset;
-use models::relays::KasaPlug;
-
+use crate::utils::load_config::ConfigLocation;
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::Header;
-use rocket::response::content::RawJson;
-use rocket::{Request, Response};
-
-use utils::local_config_utils::load_config;
-use crate::models::relays::Relay;
+use rocket::http::{Header, Status};
+use rocket::serde::json::Json;
+use rocket::{Request, Response, State};
+use serde_json::json;
 
 #[macro_use]
 extern crate rocket;
 
-static mut RELAYS: Mutex<Vec<KasaPlug>> = Mutex::new(Vec::new());
-static mut PRESETS: Mutex<Vec<Preset>> = Mutex::new(Vec::new());
-
 #[get("/")]
-fn index_state() -> RawJson<String> {
-    RawJson(json!( {"HealthCheck": true}).to_string())
+fn index_state() -> ApiResponse {
+    ApiResponse {
+        value: Json(json!( {"HealthCheck": true})),
+        status: Status::Ok,
+    }
 }
 
 #[get("/status")]
-fn status_route() -> RawJson<String> {
-    let status: Result<Value, Error> = get_status();
+fn status_route(channels: &State<Channels>) -> ApiResponse {
+    let error_message = ApiResponse {
+        value: Json(json!({"Error": "Could not get preset names"})),
+        status: Status::new(500),
+    };
 
-    match status {
-        Ok(result) => RawJson(result.to_string()),
-        Err(error) => {
-            RawJson(json!( {"Error": format!("Could not get status {}", error)}).to_string())
-        }
-    }
-}
-
-#[get("/switch")]
-pub fn switch_route() -> RawJson<String> {
-    unsafe {
-        let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
-
-        for relay in relays.iter_mut() {
-            let _ = relay.switch();
-        }
+    if channels
+        .route_to_data_sender
+        .send(ThreadPackage::ThreadCommand(SystemStatus))
+        .is_err()
+    {
+        return error_message;
     }
 
-    RawJson(json!( {"Switched": true}).to_string())
+    let res = channels.data_to_route_receiver.lock().unwrap().recv();
+    match res {
+        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Value(final_response))) => ApiResponse {
+            value: Json(final_response),
+            status: Status::Ok,
+        },
+        _ => error_message,
+    }
 }
 
 #[get("/refresh")]
-fn refresh_route() -> RawJson<String> {
-    let initial_setup = setup();
-    match initial_setup {
-        Ok(..) => RawJson(json!( {"Refreshed": true}).to_string()),
-        Err(..) => RawJson(json!( {"Refreshed": false}).to_string()),
-    }
-}
+fn refresh_route(channels: &State<Channels>) -> ApiResponse {
+    let error_message = ApiResponse {
+        value: Json(json!({"Error": "Could not refresh config"})),
+        status: Status::new(500),
+    };
 
-#[get("/preset/getPresets")]
-fn get_presets_route() -> RawJson<String> {
-    let mut result: Vec<Value> = Vec::new();
-    unsafe {
-        for preset in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            result.push(preset.to_json());
-        }
-    }
-    RawJson(serde_json::to_string(&result).expect("Penis"))
-}
-
-#[get("/preset/getPresetNames")]
-fn get_preset_names_route() -> RawJson<String> {
-    let mut result: Vec<String> = Vec::new();
-    unsafe {
-        for preset in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            result.push(preset.name.to_string());
-        }
+    if channels
+        .route_to_data_sender
+        .send(ThreadPackage::ThreadCommand(Refresh))
+        .is_err()
+    {
+        return error_message;
     }
 
-    RawJson(serde_json::to_string(&result).expect("Penis"))
-}
-
-#[get("/preset/setPreset/<preset_name>")]
-fn set_preset_route(preset_name: String) -> RawJson<String> {
-    let mut found = false;
-    unsafe {
-        for pres in PRESETS.lock().expect("Error getting global PRESETS").iter() {
-            if pres.name.to_lowercase() == preset_name.to_lowercase() {
-                set_preset(pres);
-                found = true;
-                break;
-            }
-        }
+    let res = channels.data_to_route_receiver.lock().unwrap().recv();
+    match res {
+        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Bool(final_response))) => ApiResponse {
+            value: Json(json!({"refresh" : final_response})),
+            status: Status::Ok,
+        },
+        _ => error_message,
     }
-
-    match found {
-        true => RawJson(json!( {"PresetSet": true}).to_string()),
-        false => RawJson(json!( {"Error": "Could not find preset name in presets"}).to_string()),
-    }
-}
-
-#[get("/relay/<relay_name>/set/<value>")]
-fn set_relay_route(relay_name: String, value: bool) -> RawJson<String> {
-    let result = set_relay(&relay_name, &value);
-
-    match result {
-        Ok(result) => RawJson(json!( {"RelaySet": result}).to_string()),
-        Err(error) => RawJson(
-            json!( {"Error": format!("Could not find preset name in presets {}", error)})
-                .to_string(),
-        ),
-    }
-}
-
-#[get("/relay/<relay_name>/switch/<value>")]
-fn switch_relay_route(relay_name: String, value: bool) -> RawJson<String> {
-    let relay_status = get_relay(&relay_name)?;
-
-    let result = relay_status.switch();
-    
-    match result {
-        Ok(result) => RawJson(json!( {"RelaySet": result}).to_string()),
-        Err(error) => RawJson(
-            json!( {"Error": format!("Could not find preset name in presets {}", error)})
-                .to_string(),
-        ),
-    }
-}
-
-
-fn set_preset(preset: &Preset) {
-    unsafe {
-        let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
-        for relay in relays.iter_mut() {
-            let rel = preset.relays.get_key_value(&relay.name);
-            match rel {
-                Some(temp) => {
-                    let (_, &value) = temp;
-                    if value {
-                        relay.turn_on().expect("Can't Connect to Plug");
-                    } else {
-                        relay.turn_on().expect("Can't Connect to Plug");
-                    }
-                }
-                None => {
-                    println!("Not found relay {}", relay.name);
-                    let _ = relay.turn_off().expect("Can't Connect to Plug");
-                }
-            }
-        }
-    }
-}
-
-fn set_relay(relay_name: &String, value: &bool) -> Result<bool, Error> {
-    let mut found = false;
-    unsafe {
-        let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
-        for relay in relays.iter_mut() {
-            if relay.name.to_lowercase() == relay_name.to_lowercase() {
-                found = true;
-                match value {
-                    true => {
-                        let _ = relay.turn_on().expect("Can't Connect to Plug");
-                    }
-                    false => {
-                        let _ = relay.turn_off().expect("Can't Connect to Plug");
-                    }
-                }
-            }
-        }
-    }
-
-    match found {
-        true => Ok(true),
-        false => Err(Error::new(ErrorKind::Other, "Can't find Relay".to_string())),
-    }
-}
-
-
-fn get_relay(relay_name: &String) -> Result<&mut KasaPlug, Error> {
-    unsafe {
-        let mut relays = RELAYS.lock().expect("Error getting global RELAYS");
-        for relay in relays.iter_mut() {
-            if relay.name.to_lowercase() == relay_name.to_lowercase() {
-                return Ok(relay);
-            }
-        }
-    }
-
-    Err(Error::new(ErrorKind::Other, "Can't find Relay".to_string()))
-}
-
-fn get_status() -> Result<Value, Error> {
-    let mut result: Value = json!({});
-    let mut relays: Vec<Value> = Vec::new();
-    let mut rooms: HashSet<String> = HashSet::new();
-    unsafe {
-        for relay in RELAYS.lock().expect("Error getting global RELAYS").iter() {
-            relays.push(relay.to_json());
-            rooms.insert(relay.room.clone());
-        }
-    }
-
-    result["relays"] = Value::Array(relays);
-    result["rooms"] = Value::Array(rooms.into_iter().map(Value::String).collect());
-
-    Ok(result)
-}
-
-fn setup() -> Result<bool, Error> {
-    let config = load_config()?;
-
-    unsafe {
-        RELAYS = Mutex::new(config.relays);
-        PRESETS = Mutex::new(config.presets);
-    }
-
-    Ok(true)
 }
 
 pub struct Cors;
@@ -249,27 +105,50 @@ impl Fairing for Cors {
     }
 }
 
+#[derive(Debug)]
+struct Channels {
+    route_to_data_sender: Sender<ThreadPackage>,
+    data_to_route_receiver: Arc<Mutex<Receiver<ThreadPackage>>>,
+}
+
 #[launch]
-fn rocket() -> _ {
-    let initial_setup = setup();
-    match initial_setup {
-        Ok(..) => {
-            println!("Initial Setup Successful")
-        }
-        Err(error) => panic!("{}", format!("Initial setup failed {error}")),
+async fn rocket() -> _ {
+    let args: Vec<String> = env::args().collect();
+
+    let mut config_location = ConfigLocation::MONGODB;
+    if args.contains(&"LOCAL_CONFIG".to_string()) {
+        config_location = ConfigLocation::LOCAL
     }
 
-    rocket::build().attach(Cors).mount(
+    println!("Loading config from: {config_location}");
+
+    let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<ThreadPackage>();
+    let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<ThreadPackage>();
+
+    let channels = Channels {
+        route_to_data_sender,
+        data_to_route_receiver: Arc::new(Mutex::new(data_to_route_receiver)),
+    };
+
+    let data_thread = setup_data_thread(
+        data_to_route_sender,
+        route_to_data_receiver,
+        config_location,
+    );
+
+    let _ = data_thread.thread();
+
+    let server = rocket::build().attach(Cors).manage(channels).mount(
         "/",
         routes![
             index_state,
             status_route,
-            switch_route,
             refresh_route,
-            get_presets_route,
             set_preset_route,
             get_preset_names_route,
-            set_relay_route
+            set_relay_command_route,
         ],
-    )
+    );
+
+    server
 }
