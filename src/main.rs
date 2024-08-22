@@ -1,7 +1,7 @@
 mod models;
 mod routes;
 mod utils;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc::{Receiver, RecvError, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, vec};
 
@@ -78,6 +78,10 @@ fn refresh_route(channels: &State<Channels>) -> ApiResponse {
         Ok(ThreadPackage::ThreadResponse(ThreadResponse::Bool(final_response))) => ApiResponse {
             value: Json(json!({"refresh" : final_response})),
             status: Status::Ok,
+        },
+        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Error(final_response))) => ApiResponse {
+            value: Json(json!({"Error": format!("{:?}", final_response)})),
+            status: Status::new(500),
         },
         _ => error_message,
     }

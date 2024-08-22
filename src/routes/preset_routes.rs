@@ -6,7 +6,7 @@ use crate::Channels;
 use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::State;
-use serde_json::json;
+use serde_json::{json, Value};
 #[get("/preset/set/<preset_name>")]
 pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) -> ApiResponse {
     if channels
@@ -24,15 +24,15 @@ pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) 
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
     match res {
-        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Value(final_response))) => ApiResponse {
-            value: Json(final_response),
-            status: Status::Ok,
-        },
-        _ => ApiResponse {
+        Err(error) => ApiResponse {
             value: Json(
                 json!({"Error": format!("Could not find preset to set: {}", &preset_name)}),
             ),
             status: Status::NotFound,
+        },
+        _ => ApiResponse {
+            value: Json(Value::from(true)),
+            status: Status::Ok,
         },
     }
 }

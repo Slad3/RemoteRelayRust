@@ -163,23 +163,34 @@ pub(crate) fn setup_data_thread(
 
         for received in receiver {
             match received {
-                ThreadPackage::ThreadCommand(ThreadCommand::Refresh) => {
-                    let refresh_loaded_config = load_config(config_location);
-                    match refresh_loaded_config {
-                        Ok(config) => {
-                            relays = Mutex::new(config.relays);
-                            presets = Mutex::new(config.presets);
-                            sender
-                                .send(ThreadPackage::ThreadResponse(ThreadResponse::Bool(true)))
-                                .expect("Channel possibly not open");
-                        }
-                        Err(_) => {
-                            sender
-                                .send(ThreadPackage::ThreadResponse(ThreadResponse::Bool(false)))
-                                .expect("Channel possibly not open");
+                ThreadPackage::ThreadCommand(ThreadCommand::Refresh) => match config_location {
+                    ConfigLocation::MONGODB => {
+                        sender
+                            .send(ThreadPackage::ThreadResponse(ThreadResponse::Error(
+                                "Refreshing config with MONGODB is not supported yet".to_string(),
+                            )))
+                            .expect("Channel possibly not open");
+                    }
+                    _ => {
+                        let refresh_loaded_config = load_config(config_location);
+                        match refresh_loaded_config {
+                            Ok(config) => {
+                                relays = Mutex::new(config.relays);
+                                presets = Mutex::new(config.presets);
+                                sender
+                                    .send(ThreadPackage::ThreadResponse(ThreadResponse::Bool(true)))
+                                    .expect("Channel possibly not open");
+                            }
+                            Err(_) => {
+                                sender
+                                    .send(ThreadPackage::ThreadResponse(ThreadResponse::Error(
+                                        "Could not refresh config".to_string(),
+                                    )))
+                                    .expect("Channel possibly not open");
+                            }
                         }
                     }
-                }
+                },
                 _ => {
                     let response = handle_command(received, &relays, &presets, &current_preset)
                         .expect("TODO: panic message");
