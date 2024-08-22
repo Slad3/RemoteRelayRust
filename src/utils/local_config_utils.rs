@@ -3,14 +3,14 @@ use std::collections::HashMap;
 use crate::models::config_models::Config;
 use crate::models::presets::Preset;
 use crate::models::relays::RelayType;
-use crate::models::relays::{ConfigRelayType, KasaMultiPlug, KasaPlug, LocalConfigRelay};
+use crate::models::relays::{ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::fs;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoadedConfig {
-    relays: Vec<LocalConfigRelay>,
+    relays: Vec<ConfigRelay>,
     presets: Vec<Preset>,
 }
 
@@ -25,7 +25,7 @@ pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
     Ok(configuration)
 }
 
-fn load_relays(from_config: Vec<LocalConfigRelay>) -> HashMap<String, RelayType> {
+fn load_relays(from_config: Vec<ConfigRelay>) -> HashMap<String, RelayType> {
     let mut relays: HashMap<String, RelayType> = HashMap::new();
 
     for relay in from_config {

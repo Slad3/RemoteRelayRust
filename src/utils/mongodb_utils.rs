@@ -1,6 +1,6 @@
 use crate::models::config_models::Config;
 use crate::models::presets::Preset;
-use crate::models::relays::{ConfigRelayType, KasaMultiPlug, KasaPlug, MongodbRelay, RelayType};
+use crate::models::relays::{ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug, RelayType};
 use dotenv::dotenv;
 use mongodb::{bson::doc, options::ClientOptions, Client};
 use mongodb::{Collection, Database};
@@ -23,7 +23,7 @@ async fn load_mongo_client() -> mongodb::error::Result<Client> {
 async fn find_mongo_relays(
     database: &Database,
 ) -> Result<HashMap<String, RelayType>, mongodb::error::Error> {
-    let relays_collection: Collection<MongodbRelay> = database.collection("Relays");
+    let relays_collection: Collection<ConfigRelay> = database.collection("Relays");
     let filter = doc! {};
     let query_result = relays_collection.find(filter).await;
     let relay_query = query_result?.try_collect::<Vec<_>>().await?;

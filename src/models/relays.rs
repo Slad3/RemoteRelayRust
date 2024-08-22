@@ -21,19 +21,7 @@ pub enum ConfigRelayType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct MongodbRelay {
-    #[serde(rename = "type")]
-    pub(crate) relay_type: ConfigRelayType,
-    #[serde(default)]
-    pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) names: Vec<String>,
-    pub(crate) ip: String,
-    pub(crate) room: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct LocalConfigRelay {
+pub(crate) struct ConfigRelay {
     #[serde(rename = "type")]
     pub(crate) relay_type: ConfigRelayType,
     #[serde(default)]
@@ -83,32 +71,24 @@ impl KasaPlug {
     pub fn to_json(&self) -> Value {
         json!({
             "type": "Kasa Plug",
-            "ip": &self.ip.to_string(),
-            "name": &self.name.to_string(),
+            "ip": &self.ip,
+            "name": &self.name,
             "status": &self.status,
-            "room": &self.room.to_string(),
+            "room": &self.room,
             "tags": &self.tags,
         })
     }
 
     pub fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
-        let result = kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string());
-
-        match result {
-            Ok(result) => {
-                let relay_state = result["system"]["get_sysinfo"]["relay_state"]
-                    .as_u64()
-                    .unwrap_or(0)
-                    == 1;
-                self.status = relay_state;
-                Ok(relay_state)
-            }
-            Err(..) => Err(Error::new(
-                ErrorKind::ConnectionRefused,
-                "Can't Connect To Plug".to_string(),
-            )),
-        }
+        kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()).map(|result| {
+            let relay_state = result["system"]["get_sysinfo"]["relay_state"]
+                .as_u64()
+                .unwrap_or(0)
+                == 1;
+            self.status = relay_state;
+            relay_state
+        })
     }
 
     pub fn turn_off(&mut self) -> Result<Value, Error> {
@@ -157,31 +137,32 @@ impl std::fmt::Display for KasaPlug {
 
 impl KasaMultiPlug {
     pub fn new(ip: String, names: Vec<String>, room: String) -> Vec<KasaMultiPlug> {
-        let mut plugs: Vec<KasaMultiPlug> = Vec::new();
-
-        let tags: Vec<String> = Vec::new();
-
         let command = json!({"system": {"get_sysinfo": {}}});
         let response = kasa_plug_network_functions::send(ip.clone(), command.to_string())
-            .expect(format!("Unable to connect to KasaMultiPlug {}", ip.clone()).as_str());
-        let children_value = &response["system"]["get_sysinfo"]["children"];
+            .expect(&format!("Unable to connect to KasaMultiPlug {}", ip));
 
-        if let Some(children) = children_value.as_array() {
-            for (child, name) in children.iter().zip(names.iter()) {
-                let id = child["id"].to_string()[1..child["id"].to_string().len() - 1].to_string();
-                let state = child["state"].as_u64().unwrap_or(0) == 1;
-                plugs.push(KasaMultiPlug {
-                    ip: ip.clone(),
-                    id: id.clone(),
-                    name: name.clone(),
-                    status: state,
-                    room: room.clone().parse().unwrap(),
-                    tags: tags.clone(),
-                })
-            }
-        }
-
-        plugs
+        response["system"]["get_sysinfo"]["children"]
+            .as_array()
+            .map(|children| {
+                children
+                    .iter()
+                    .zip(names.iter())
+                    .map(|(child, name)| {
+                        let id = child["id"].to_string()[1..child["id"].to_string().len() - 1]
+                            .to_string();
+                        let state = child["state"].as_u64().unwrap_or(0) == 1;
+                        KasaMultiPlug {
+                            ip: ip.clone(),
+                            id,
+                            name: name.clone(),
+                            status: state,
+                            room: room.clone().parse().unwrap(),
+                            tags: Vec::new(),
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     pub(crate) fn connected(&mut self) -> Result<bool, Error> {
@@ -191,11 +172,11 @@ impl KasaMultiPlug {
     pub fn to_json(&self) -> Value {
         json!({
             "type": "Kasa Plug",
-            "ip": &self.ip.to_string(),
-            "id": &self.id.to_string(),
-            "name": &self.name.to_string(),
-            "status": &self.status,
-            "room": &self.room.to_string(),
+            "ip": &self.ip,
+            "id": &self.id,
+            "name": &self.name,
+            "status": self.status,
+            "room": &self.room,
             "tags": &self.tags,
         })
     }
