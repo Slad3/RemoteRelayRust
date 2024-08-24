@@ -1,4 +1,4 @@
-use crate::models::data_thread_models::{RelayCommand, ThreadCommand::Relay, ThreadPackage};
+use crate::models::data_thread_models::{RelayCommand, DataThreadCommand::Relay};
 use crate::utils::data_thread_handling::{handle_command_input, unwrap_response};
 use crate::Channels;
 
@@ -25,13 +25,10 @@ pub(crate) fn set_relay_command_route(
         }
     };
 
-    if let Err(_) = channels
-        .route_to_data_sender
-        .send(ThreadPackage::ThreadCommand(Relay(RelayCommand {
-            name: relay_name.parse().unwrap(),
-            command: command_processed,
-        })))
-    {
+    if let Err(_) = channels.route_to_data_sender.send(Relay(RelayCommand {
+        name: relay_name.parse().unwrap(),
+        command: command_processed,
+    })) {
         return ApiResponse {
             value: Json(json!({"Error": "Channel closed"})),
             status: Status::new(500),

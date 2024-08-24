@@ -2,20 +2,14 @@ use rocket::serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum ThreadPackage {
-    ThreadCommand(ThreadCommand),
-    ThreadResponse(ThreadResponse),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum ThreadResponse {
+pub(crate) enum DataThreadResponse {
     Value(Value),
     Bool(bool),
     Error(String),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum ThreadCommand {
+pub(crate) enum DataThreadCommand {
     SystemStatus,
     Refresh,
     Relay(RelayCommand),

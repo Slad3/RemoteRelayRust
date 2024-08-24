@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::models::data_thread_models::{
-    PresetCommand, RelayCommand, RelayCommands, ThreadCommand, ThreadPackage, ThreadResponse,
+    PresetCommand, RelayCommand, RelayCommands, DataThreadCommand, DataThreadResponse,
 };
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::RelayType;
@@ -28,9 +28,9 @@ pub(crate) fn handle_command_input(input: &str) -> Option<RelayCommands> {
     }
 }
 
-pub(crate) fn unwrap_response(package: ThreadPackage) -> Json<Value> {
+pub(crate) fn unwrap_response(package: DataThreadResponse) -> Json<Value> {
     match package {
-        ThreadPackage::ThreadResponse(ThreadResponse::Value(value)) => Json(value),
+        DataThreadResponse::Value(value) => Json(value),
         _ => Json(json!( {"Error": ""})),
     }
 }
@@ -38,28 +38,28 @@ pub(crate) fn unwrap_response(package: ThreadPackage) -> Json<Value> {
 fn handle_relay_command(
     relay_command: RelayCommand,
     relays: &Mutex<HashMap<String, RelayType>>,
-) -> Result<ThreadResponse, Error> {
+) -> Result<DataThreadResponse, Error> {
     if let Some(relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
         match relay_command.command {
-            RelayCommands::SWITCH => Ok(ThreadResponse::Value(match relay {
+            RelayCommands::SWITCH => Ok(DataThreadResponse::Value(match relay {
                 RelayType::KasaPlug(plug) => plug.switch()?,
                 RelayType::KasaMultiPlug(plug) => plug.switch()?,
             })),
-            RelayCommands::TRUE => Ok(ThreadResponse::Value(match relay {
+            RelayCommands::TRUE => Ok(DataThreadResponse::Value(match relay {
                 RelayType::KasaPlug(plug) => plug.turn_on()?,
                 RelayType::KasaMultiPlug(plug) => plug.turn_on()?,
             })),
-            RelayCommands::FALSE => Ok(ThreadResponse::Value(match relay {
+            RelayCommands::FALSE => Ok(DataThreadResponse::Value(match relay {
                 RelayType::KasaPlug(plug) => plug.turn_off()?,
                 RelayType::KasaMultiPlug(plug) => plug.turn_off()?,
             })),
-            RelayCommands::STATUS => Ok(ThreadResponse::Bool(match relay {
+            RelayCommands::STATUS => Ok(DataThreadResponse::Bool(match relay {
                 RelayType::KasaPlug(plug) => plug.get_status()?,
                 RelayType::KasaMultiPlug(plug) => plug.get_status()?,
             })),
         }
     } else {
-        Ok(ThreadResponse::Bool(false))
+        Ok(DataThreadResponse::Bool(false))
     }
 }
 
@@ -68,10 +68,10 @@ fn handle_preset_command(
     relays: &Mutex<HashMap<String, RelayType>>,
     presets: &Mutex<HashMap<String, Preset>>,
     current_preset: &Mutex<String>,
-) -> Result<ThreadResponse, Error> {
+) -> Result<DataThreadResponse, Error> {
     match preset_command {
         PresetCommand::Names => match get_preset_names(presets) {
-            Ok(response) => Ok(ThreadResponse::Value(Value::Array(response))),
+            Ok(response) => Ok(DataThreadResponse::Value(Value::Array(response))),
             Err(error) => Err(error),
         },
         PresetCommand::Set(preset_name) => {
@@ -80,36 +80,33 @@ fn handle_preset_command(
                     Ok(boolean) => {
                         let mut temp_current_preset = current_preset.lock().unwrap();
                         *temp_current_preset = preset.name.clone().to_string();
-                        Ok(ThreadResponse::Bool(boolean))
+                        Ok(DataThreadResponse::Bool(boolean))
                     }
                     Err(error) => Err(error),
                 }
             } else {
-                Ok(ThreadResponse::Bool(false))
+                Ok(DataThreadResponse::Bool(false))
             }
         }
     }
 }
 
 fn handle_command(
-    received: ThreadPackage,
+    received: DataThreadCommand,
     relays: &Mutex<HashMap<String, RelayType>>,
     presets: &Mutex<HashMap<String, Preset>>,
     current_preset: &Mutex<String>,
-) -> Result<ThreadResponse, Error> {
+) -> Result<DataThreadResponse, Error> {
     match received {
-        ThreadPackage::ThreadCommand(command) => match command {
-            ThreadCommand::Relay(relay_command) => handle_relay_command(relay_command, relays),
-            ThreadCommand::Preset(preset_command) => {
-                handle_preset_command(preset_command, relays, presets, current_preset)
-            }
-            ThreadCommand::SystemStatus => Ok(ThreadResponse::Value(get_status(
-                relays,
-                current_preset.lock().unwrap().to_string(),
-            )?)),
-            ThreadCommand::Refresh => Ok(ThreadResponse::Bool(false)),
-        },
-        _ => Ok(ThreadResponse::Bool(true)),
+        DataThreadCommand::Relay(relay_command) => handle_relay_command(relay_command, relays),
+        DataThreadCommand::Preset(preset_command) => {
+            handle_preset_command(preset_command, relays, presets, current_preset)
+        }
+        DataThreadCommand::SystemStatus => Ok(DataThreadResponse::Value(get_status(
+            relays,
+            current_preset.lock().unwrap().to_string(),
+        )?)),
+        DataThreadCommand::Refresh => Ok(DataThreadResponse::Bool(false)),
     }
 }
 
@@ -141,8 +138,8 @@ pub(crate) fn get_status(
 }
 
 pub(crate) fn setup_data_thread(
-    sender: Sender<ThreadPackage>,
-    receiver: Receiver<ThreadPackage>,
+    sender: Sender<DataThreadResponse>,
+    receiver: Receiver<DataThreadCommand>,
     config_location: ConfigLocation,
 ) -> JoinHandle<()> {
     let loaded_config = load_config(config_location).expect("Could not set up thread");
@@ -163,12 +160,12 @@ pub(crate) fn setup_data_thread(
 
         for received in receiver {
             match received {
-                ThreadPackage::ThreadCommand(ThreadCommand::Refresh) => match config_location {
+                DataThreadCommand::Refresh => match config_location {
                     ConfigLocation::MONGODB => {
                         sender
-                            .send(ThreadPackage::ThreadResponse(ThreadResponse::Error(
+                            .send(DataThreadResponse::Error(
                                 "Refreshing config with MONGODB is not supported yet".to_string(),
-                            )))
+                            ))
                             .expect("Channel possibly not open");
                     }
                     _ => {
@@ -178,14 +175,14 @@ pub(crate) fn setup_data_thread(
                                 relays = Mutex::new(config.relays);
                                 presets = Mutex::new(config.presets);
                                 sender
-                                    .send(ThreadPackage::ThreadResponse(ThreadResponse::Bool(true)))
+                                    .send(DataThreadResponse::Bool(true))
                                     .expect("Channel possibly not open");
                             }
                             Err(_) => {
                                 sender
-                                    .send(ThreadPackage::ThreadResponse(ThreadResponse::Error(
+                                    .send(DataThreadResponse::Error(
                                         "Could not refresh config".to_string(),
-                                    )))
+                                    ))
                                     .expect("Channel possibly not open");
                             }
                         }
@@ -194,9 +191,7 @@ pub(crate) fn setup_data_thread(
                 _ => {
                     let response = handle_command(received, &relays, &presets, &current_preset)
                         .expect("TODO: panic message");
-                    sender
-                        .send(ThreadPackage::ThreadResponse(response))
-                        .expect("TODO: panic message");
+                    sender.send(response).expect("TODO: panic message");
                 }
             }
         }

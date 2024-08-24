@@ -1,7 +1,7 @@
 mod models;
 mod routes;
 mod utils;
-use std::sync::mpsc::{Receiver, RecvError, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
 use std::{env, vec};
 
@@ -10,8 +10,9 @@ use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
 use crate::routes::relay_routes::set_relay_command_route;
 
 use crate::models::data_thread_models::{
-    ThreadCommand::{Refresh, SystemStatus},
-    ThreadPackage, ThreadResponse,
+    DataThreadCommand,
+    DataThreadCommand::{Refresh, SystemStatus},
+    DataThreadResponse,
 };
 use crate::utils::data_thread_handling::setup_data_thread;
 
@@ -40,17 +41,13 @@ fn status_route(channels: &State<Channels>) -> ApiResponse {
         status: Status::new(500),
     };
 
-    if channels
-        .route_to_data_sender
-        .send(ThreadPackage::ThreadCommand(SystemStatus))
-        .is_err()
-    {
+    if channels.route_to_data_sender.send(SystemStatus).is_err() {
         return error_message;
     }
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
     match res {
-        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Value(final_response))) => ApiResponse {
+        Ok(DataThreadResponse::Value(final_response)) => ApiResponse {
             value: Json(final_response),
             status: Status::Ok,
         },
@@ -65,21 +62,17 @@ fn refresh_route(channels: &State<Channels>) -> ApiResponse {
         status: Status::new(500),
     };
 
-    if channels
-        .route_to_data_sender
-        .send(ThreadPackage::ThreadCommand(Refresh))
-        .is_err()
-    {
+    if channels.route_to_data_sender.send(Refresh).is_err() {
         return error_message;
     }
 
     let res = channels.data_to_route_receiver.lock().unwrap().recv();
     match res {
-        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Bool(final_response))) => ApiResponse {
+        Ok(DataThreadResponse::Bool(final_response)) => ApiResponse {
             value: Json(json!({"refresh" : final_response})),
             status: Status::Ok,
         },
-        Ok(ThreadPackage::ThreadResponse(ThreadResponse::Error(final_response))) => ApiResponse {
+        Ok(DataThreadResponse::Error(final_response)) => ApiResponse {
             value: Json(json!({"Error": format!("{:?}", final_response)})),
             status: Status::new(500),
         },
@@ -111,8 +104,8 @@ impl Fairing for Cors {
 
 #[derive(Debug)]
 struct Channels {
-    route_to_data_sender: Sender<ThreadPackage>,
-    data_to_route_receiver: Arc<Mutex<Receiver<ThreadPackage>>>,
+    route_to_data_sender: Sender<DataThreadCommand>,
+    data_to_route_receiver: Arc<Mutex<Receiver<DataThreadResponse>>>,
 }
 
 #[launch]
@@ -126,8 +119,8 @@ async fn rocket() -> _ {
 
     println!("Loading config from: {config_location}");
 
-    let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<ThreadPackage>();
-    let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<ThreadPackage>();
+    let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<DataThreadCommand>();
+    let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<DataThreadResponse>();
 
     let channels = Channels {
         route_to_data_sender,
