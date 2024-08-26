@@ -119,20 +119,18 @@ struct Channels {
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
 struct Args {
-    #[arg(short, long, default_value_t = false)]
-    local_config: bool,
-
-    #[arg(short, long, default_value_t = false)]
-    mongo_config: bool,
+    #[arg(short, long)]
+    config: String,
 }
 
 fn get_config_location(args: Args) -> ConfigLocation {
-    if args.local_config {
-        ConfigLocation::LOCAL
-    } else if args.mongo_config {
-        ConfigLocation::MONGODB
-    } else {
-        ConfigLocation::LOCAL
+    match args.config.as_str() {
+        "local" => ConfigLocation::LOCAL,
+        "mongodb" => ConfigLocation::MONGODB,
+        _ => {
+            eprintln!("No config= argument found, defaulting to local");
+            ConfigLocation::LOCAL
+        }
     }
 }
 
