@@ -3,7 +3,7 @@ mod routes;
 mod utils;
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{mpsc, Arc, Mutex};
-use std::{env, vec};
+use std::vec;
 
 use crate::models::api_response::ApiResponse;
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
@@ -15,8 +15,8 @@ use crate::models::data_thread_models::{
     DataThreadResponse,
 };
 use crate::utils::data_thread_handling::setup_data_thread;
-
 use crate::utils::load_config::ConfigLocation;
+use clap::Parser;
 use rocket::fairing::{Fairing, Info, Kind};
 use rocket::http::{Header, Status};
 use rocket::serde::json::Json;
@@ -45,8 +45,12 @@ fn status_route(channels: &State<Channels>) -> ApiResponse {
         return error_message;
     }
 
-    let res = channels.data_to_route_receiver.lock().unwrap().recv();
-    match res {
+    match channels
+        .data_to_route_receiver
+        .lock()
+        .expect("Got data from channel")
+        .recv()
+    {
         Ok(DataThreadResponse::Value(final_response)) => ApiResponse {
             value: Json(final_response),
             status: Status::Ok,
@@ -66,8 +70,12 @@ fn refresh_route(channels: &State<Channels>) -> ApiResponse {
         return error_message;
     }
 
-    let res = channels.data_to_route_receiver.lock().unwrap().recv();
-    match res {
+    match channels
+        .data_to_route_receiver
+        .lock()
+        .expect("Got data from channel")
+        .recv()
+    {
         Ok(DataThreadResponse::Bool(final_response)) => ApiResponse {
             value: Json(json!({"refresh" : final_response})),
             status: Status::Ok,
@@ -108,14 +116,31 @@ struct Channels {
     data_to_route_receiver: Arc<Mutex<Receiver<DataThreadResponse>>>,
 }
 
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+struct Args {
+    #[arg(short, long, default_value_t = false)]
+    local_config: bool,
+
+    #[arg(short, long, default_value_t = false)]
+    mongo_config: bool,
+}
+
+fn get_config_location(args: Args) -> ConfigLocation {
+    if args.local_config {
+        ConfigLocation::LOCAL
+    } else if args.mongo_config {
+        ConfigLocation::MONGODB
+    } else {
+        ConfigLocation::LOCAL
+    }
+}
+
 #[launch]
 async fn rocket() -> _ {
-    let args: Vec<String> = env::args().collect();
+    let args: Args = Args::parse();
 
-    let mut config_location = ConfigLocation::MONGODB;
-    if args.contains(&"LOCAL_CONFIG".to_string()) {
-        config_location = ConfigLocation::LOCAL
-    }
+    let config_location = get_config_location(args);
 
     println!("Loading config from: {config_location}");
 

@@ -1,5 +1,7 @@
 use crate::models::api_response::ApiResponse;
-use crate::models::data_thread_models::{PresetCommand, DataThreadCommand::Preset, DataThreadResponse};
+use crate::models::data_thread_models::{
+    DataThreadCommand::Preset, DataThreadResponse, PresetCommand,
+};
 use crate::Channels;
 use rocket::http::Status;
 use rocket::serde::json::Json;
@@ -18,8 +20,12 @@ pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) 
         };
     }
 
-    let res = channels.data_to_route_receiver.lock().unwrap().recv();
-    match res {
+    match channels
+        .data_to_route_receiver
+        .lock()
+        .expect("Got data from channel")
+        .recv()
+    {
         Err(_) => ApiResponse {
             value: Json(
                 json!({"Error": format!("Could not find preset to set: {}", &preset_name)}),
@@ -48,8 +54,12 @@ pub(crate) fn get_preset_names_route(channels: &State<Channels>) -> ApiResponse 
         return error_message;
     }
 
-    let res = channels.data_to_route_receiver.lock().unwrap().recv();
-    match res {
+    match channels
+        .data_to_route_receiver
+        .lock()
+        .expect("Got data from channel")
+        .recv()
+    {
         Ok(DataThreadResponse::Value(final_response)) => ApiResponse {
             value: Json(final_response),
             status: Status::Ok,

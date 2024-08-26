@@ -15,7 +15,7 @@ cargo run --color=always
 
 ## Config and Config Options
 
-Currently, you can set your configuration via local file in `config.json` or through a MongoDB database through a `.env` file. Application defaults to MongoDB config.
+Currently, you can set your configuration via local file in `config.json` or through a MongoDB database through a `.env` file. Application defaults to local config.
 
 ### Local Configuration
 

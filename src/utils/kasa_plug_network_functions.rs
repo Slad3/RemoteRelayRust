@@ -52,8 +52,7 @@ pub fn send(ip: String, cmd: String) -> Result<Value, Error> {
 }
 pub fn get_info(ip: String) -> Result<Value, Error> {
     let cmd = json!({"system": {"get_sysinfo": {}}});
-    let result = send(ip.clone(), cmd.to_string());
-    match result {
+    match send(ip.clone(), cmd.to_string()) {
         Ok(result) => Ok(result["system"]["get_sysinfo"].clone()),
         Err(..) => Err(Error::new(
             ErrorKind::ConnectionRefused,

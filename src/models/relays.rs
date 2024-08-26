@@ -93,8 +93,8 @@ impl KasaPlug {
 
     pub fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
-        let result = kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string());
-        match result {
+
+        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
             Ok(..) => {
                 self.status = false;
                 Ok(self.to_json())
@@ -108,8 +108,7 @@ impl KasaPlug {
 
     pub fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
-        let result = kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string());
-        match result {
+        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
             Ok(..) => {
                 self.status = true;
                 Ok(self.to_json())
@@ -183,9 +182,8 @@ impl KasaMultiPlug {
 
     pub fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
-        let result = kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string());
 
-        match result {
+        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
             Ok(result) => {
                 let relay_state = result["system"]["get_sysinfo"].as_u64().unwrap_or(0) == 1;
 
@@ -201,8 +199,7 @@ impl KasaMultiPlug {
 
     pub fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 0}}});
-        let result = kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string());
-        match result {
+        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
             Ok(..) => {
                 self.status = false;
                 Ok(self.to_json())
@@ -216,8 +213,7 @@ impl KasaMultiPlug {
 
     pub fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 1}}});
-        let result = kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string());
-        match result {
+        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
             Ok(..) => {
                 self.status = true;
                 Ok(self.to_json())

@@ -19,8 +19,7 @@ pub(crate) fn set_preset(
 ) -> Result<bool, Error> {
     let mut relays = relays.lock().expect("Error getting global RELAYS");
     for (relay_name, relay) in relays.iter_mut() {
-        let rel = preset.relays.get_key_value(relay_name);
-        match rel {
+        match preset.relays.get_key_value(relay_name) {
             Some((_, &value)) => {
                 if value {
                     match relay {

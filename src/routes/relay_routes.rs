@@ -1,4 +1,4 @@
-use crate::models::data_thread_models::{RelayCommand, DataThreadCommand::Relay};
+use crate::models::data_thread_models::{DataThreadCommand::Relay, RelayCommand};
 use crate::utils::data_thread_handling::{handle_command_input, unwrap_response};
 use crate::Channels;
 

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::models::data_thread_models::{
-    PresetCommand, RelayCommand, RelayCommands, DataThreadCommand, DataThreadResponse,
+    DataThreadCommand, DataThreadResponse, PresetCommand, RelayCommand, RelayCommands,
 };
 use crate::models::presets::{get_preset_names, set_preset, Preset};
 use crate::models::relays::RelayType;
@@ -168,25 +168,22 @@ pub(crate) fn setup_data_thread(
                             ))
                             .expect("Channel possibly not open");
                     }
-                    _ => {
-                        let refresh_loaded_config = load_config(config_location);
-                        match refresh_loaded_config {
-                            Ok(config) => {
-                                relays = Mutex::new(config.relays);
-                                presets = Mutex::new(config.presets);
-                                sender
-                                    .send(DataThreadResponse::Bool(true))
-                                    .expect("Channel possibly not open");
-                            }
-                            Err(_) => {
-                                sender
-                                    .send(DataThreadResponse::Error(
-                                        "Could not refresh config".to_string(),
-                                    ))
-                                    .expect("Channel possibly not open");
-                            }
+                    _ => match load_config(config_location) {
+                        Ok(config) => {
+                            relays = Mutex::new(config.relays);
+                            presets = Mutex::new(config.presets);
+                            sender
+                                .send(DataThreadResponse::Bool(true))
+                                .expect("Channel possibly not open");
                         }
-                    }
+                        Err(_) => {
+                            sender
+                                .send(DataThreadResponse::Error(
+                                    "Could not refresh config".to_string(),
+                                ))
+                                .expect("Channel possibly not open");
+                        }
+                    },
                 },
                 _ => {
                     let response = handle_command(received, &relays, &presets, &current_preset)
