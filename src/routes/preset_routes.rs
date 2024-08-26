@@ -1,8 +1,8 @@
 use crate::models::api_response::ApiResponse;
+use crate::models::channels_models::Channels;
 use crate::models::data_thread_models::{
     DataThreadCommand::Preset, DataThreadResponse, PresetCommand,
 };
-use crate::Channels;
 use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::State;

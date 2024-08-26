@@ -1,6 +1,6 @@
+use crate::models::channels_models::Channels;
 use crate::models::data_thread_models::{DataThreadCommand::Relay, RelayCommand};
 use crate::utils::data_thread_handling::{handle_command_input, unwrap_response};
-use crate::Channels;
 
 use crate::models::api_response::ApiResponse;
 use serde_json::json;
