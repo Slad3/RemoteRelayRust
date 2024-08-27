@@ -1,6 +1,7 @@
 mod models;
 mod routes;
 mod utils;
+
 use std::sync::{mpsc, Arc, Mutex};
 use std::vec;
 
@@ -14,7 +15,6 @@ use crate::models::rocket_cors::Cors;
 use crate::utils::data_thread_handling::setup_data_thread;
 use crate::utils::load_config::ConfigLocation;
 use clap::Parser;
-use rocket::fairing::Fairing;
 
 #[macro_use]
 extern crate rocket;
@@ -23,13 +23,13 @@ extern crate rocket;
 #[command(version, about, long_about = None)]
 struct Args {
     #[arg(short, long)]
-    config: String,
+    config: Option<String>,
 }
 
 fn get_config_location(args: Args) -> ConfigLocation {
-    match args.config.as_str() {
+    match args.config.unwrap_or("local".to_string()).as_str() {
         "local" => ConfigLocation::LOCAL,
-        "mongodb" => ConfigLocation::MONGODB,
+        "mongodb" | "mongo" => ConfigLocation::MONGODB,
         _ => {
             eprintln!("No config= argument found, defaulting to local");
             ConfigLocation::LOCAL
