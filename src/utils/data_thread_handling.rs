@@ -37,9 +37,9 @@ pub(crate) fn unwrap_response(package: DataThreadResponse) -> Json<Value> {
 
 fn handle_relay_command(
     relay_command: RelayCommand,
-    relays: &Mutex<HashMap<String, RelayType>>,
+    relays: &mut HashMap<String, RelayType>,
 ) -> Result<DataThreadResponse, Error> {
-    if let Some(relay) = relays.lock().unwrap().get_mut(&relay_command.name) {
+    if let Some(relay) = relays.get_mut(&relay_command.name) {
         match relay_command.command {
             RelayCommands::SWITCH => Ok(DataThreadResponse::Value(match relay {
                 RelayType::KasaPlug(plug) => plug.switch()?,
@@ -65,8 +65,8 @@ fn handle_relay_command(
 
 fn handle_preset_command(
     preset_command: PresetCommand,
-    relays: &Mutex<HashMap<String, RelayType>>,
-    presets: &Mutex<HashMap<String, Preset>>,
+    relays: &mut HashMap<String, RelayType>,
+    presets: &mut HashMap<String, Preset>,
     current_preset: &Mutex<String>,
 ) -> Result<DataThreadResponse, Error> {
     match preset_command {
@@ -75,7 +75,7 @@ fn handle_preset_command(
             Err(error) => Err(error),
         },
         PresetCommand::Set(preset_name) => {
-            if let Some(preset) = presets.lock().unwrap().get_mut(&preset_name) {
+            if let Some(preset) = presets.get_mut(&preset_name) {
                 match set_preset(preset, relays) {
                     Ok(boolean) => {
                         let mut temp_current_preset = current_preset.lock().unwrap();
@@ -93,8 +93,8 @@ fn handle_preset_command(
 
 fn handle_command(
     received: DataThreadCommand,
-    relays: &Mutex<HashMap<String, RelayType>>,
-    presets: &Mutex<HashMap<String, Preset>>,
+    relays: &mut HashMap<String, RelayType>,
+    presets: &mut HashMap<String, Preset>,
     current_preset: &Mutex<String>,
 ) -> Result<DataThreadResponse, Error> {
     match received {
@@ -111,14 +111,14 @@ fn handle_command(
 }
 
 pub(crate) fn get_status(
-    relays: &Mutex<HashMap<String, RelayType>>,
+    relays: &HashMap<String, RelayType>,
     current_preset: String,
 ) -> Result<Value, Error> {
     let mut result: Value = json!({});
     let mut relay_statuses: Vec<Value> = Vec::new();
     let mut rooms: HashSet<String> = HashSet::new();
 
-    for (_, relay) in relays.lock().expect("Error getting global RELAYS").iter() {
+    for (_, relay) in relays.iter() {
         relay_statuses.push(match relay {
             RelayType::KasaPlug(plug) => plug.to_json(),
             RelayType::KasaMultiPlug(plug) => plug.to_json(),
@@ -144,17 +144,17 @@ pub(crate) fn setup_data_thread(
 ) -> JoinHandle<()> {
     let loaded_config = load_config(config_location).expect("Could not set up thread");
     thread::spawn(move || {
-        let mut relays: Mutex<HashMap<String, RelayType>> = Mutex::new(loaded_config.relays);
-        let mut presets: Mutex<HashMap<String, Preset>> = Mutex::new(loaded_config.presets);
+        let mut relays: HashMap<String, RelayType> = loaded_config.relays;
+        let mut presets: HashMap<String, Preset> = loaded_config.presets;
         let current_preset = Mutex::new("Custom".to_string());
 
         println!("Relays:");
-        for (relay_name, _) in relays.lock().unwrap().iter() {
+        for (relay_name, _) in relays.iter() {
             println!("\t{relay_name}");
         }
 
         println!("Presets:");
-        for (preset_name, _) in presets.lock().unwrap().iter() {
+        for (preset_name, _) in presets.iter() {
             println!("\t{preset_name}");
         }
 
@@ -170,8 +170,8 @@ pub(crate) fn setup_data_thread(
                     }
                     _ => match load_config(config_location) {
                         Ok(config) => {
-                            relays = Mutex::new(config.relays);
-                            presets = Mutex::new(config.presets);
+                            relays = config.relays;
+                            presets = config.presets;
                             sender
                                 .send(DataThreadResponse::Bool(true))
                                 .expect("Channel possibly not open");
@@ -186,7 +186,7 @@ pub(crate) fn setup_data_thread(
                     },
                 },
                 _ => {
-                    let response = handle_command(received, &relays, &presets, &current_preset)
+                    let response = handle_command(received, &mut relays, &mut presets, &current_preset)
                         .expect("TODO: panic message");
                     sender.send(response).expect("TODO: panic message");
                 }
