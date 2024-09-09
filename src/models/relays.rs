@@ -14,6 +14,7 @@ pub enum RelayType {
     KasaMultiPlug(KasaMultiPlug),
 }
 
+
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ConfigRelayType {
     KasaPlug,

@@ -160,30 +160,21 @@ pub(crate) fn setup_data_thread(
 
         for received in receiver {
             match received {
-                DataThreadCommand::Refresh => match config_location {
-                    ConfigLocation::MONGODB => {
+                DataThreadCommand::Refresh => match load_config(config_location) {
+                    Ok(config) => {
+                        relays = config.relays;
+                        presets = config.presets;
+                        sender
+                            .send(DataThreadResponse::Bool(true))
+                            .expect("Channel possibly not open");
+                    }
+                    Err(_) => {
                         sender
                             .send(DataThreadResponse::Error(
-                                "Refreshing config with MONGODB is not supported yet".to_string(),
+                                "Could not refresh config".to_string(),
                             ))
                             .expect("Channel possibly not open");
                     }
-                    _ => match load_config(config_location) {
-                        Ok(config) => {
-                            relays = config.relays;
-                            presets = config.presets;
-                            sender
-                                .send(DataThreadResponse::Bool(true))
-                                .expect("Channel possibly not open");
-                        }
-                        Err(_) => {
-                            sender
-                                .send(DataThreadResponse::Error(
-                                    "Could not refresh config".to_string(),
-                                ))
-                                .expect("Channel possibly not open");
-                        }
-                    },
                 },
                 _ => {
                     let response = handle_command(received, &mut relays, &mut presets, &current_preset)

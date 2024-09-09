@@ -2,8 +2,8 @@ use crate::models::config_models::Config;
 use crate::utils::local_config_utils::load_local_config;
 use crate::utils::mongodb_utils::load_mongo_config;
 use std::io::{Error, ErrorKind};
-
-use futures::executor::block_on;
+use std::thread;
+use tokio::runtime::Runtime;
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) enum ConfigLocation {
@@ -24,8 +24,12 @@ impl std::fmt::Display for ConfigLocation {
 pub fn load_config(config_location: ConfigLocation) -> Result<Config, Error> {
     match config_location {
         ConfigLocation::MONGODB => {
-            let config = block_on(load_mongo_config());
-            match config {
+            let mongodb_config = thread::spawn(move || {
+                let rt = Runtime::new().expect("Could not create runtime");
+                rt.block_on(load_mongo_config())
+            }).join().expect("Could not join config thread");
+
+            match mongodb_config {
                 Ok(config) => Ok(config),
                 Err(error) => Err(Error::new(ErrorKind::Other, error)),
             }
