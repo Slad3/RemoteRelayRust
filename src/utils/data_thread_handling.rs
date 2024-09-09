@@ -10,7 +10,7 @@ use crate::utils::load_config::{load_config, ConfigLocation};
 
 use rocket::serde::json::Json;
 use serde_json::{json, Value};
-use std::io::Error;
+use std::io::{Error, ErrorKind};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
@@ -74,20 +74,17 @@ fn handle_preset_command(
             Ok(response) => Ok(DataThreadResponse::Value(Value::Array(response))),
             Err(error) => Err(error),
         },
-        PresetCommand::Set(preset_name) => {
-            if let Some(preset) = presets.get_mut(&preset_name) {
-                match set_preset(preset, relays) {
-                    Ok(boolean) => {
-                        let mut temp_current_preset = current_preset.lock().unwrap();
-                        *temp_current_preset = preset.name.clone().to_string();
-                        Ok(DataThreadResponse::Bool(boolean))
-                    }
-                    Err(error) => Err(error),
+        PresetCommand::Set(preset_name) => match presets.get_mut(&preset_name) {
+            Some(preset) => match set_preset(preset, relays) {
+                Ok(boolean) => {
+                    let mut temp_current_preset = current_preset.lock().unwrap();
+                    *temp_current_preset = preset.name.clone().to_string();
+                    Ok(DataThreadResponse::Bool(boolean))
                 }
-            } else {
-                Ok(DataThreadResponse::Bool(false))
-            }
-        }
+                Err(error) => Err(error),
+            },
+            None => Err(Error::new(ErrorKind::NotFound, "Unable to find preset")),
+        },
     }
 }
 
@@ -180,7 +177,7 @@ pub(crate) fn setup_data_thread(
                     let response =
                         handle_command(received, &mut relays, &mut presets, &current_preset)
                             .expect("TODO: panic message");
-                    sender.send(response).expect("TODO: panic message");
+                    sender.send(response).expect("Channel possibly not open");
                 }
             }
         }
