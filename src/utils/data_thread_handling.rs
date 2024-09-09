@@ -177,8 +177,9 @@ pub(crate) fn setup_data_thread(
                     }
                 },
                 _ => {
-                    let response = handle_command(received, &mut relays, &mut presets, &current_preset)
-                        .expect("TODO: panic message");
+                    let response =
+                        handle_command(received, &mut relays, &mut presets, &current_preset)
+                            .expect("TODO: panic message");
                     sender.send(response).expect("TODO: panic message");
                 }
             }

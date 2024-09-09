@@ -45,13 +45,8 @@ pub(crate) fn set_preset(
     Ok(true)
 }
 
-pub(crate) fn get_preset_names(
-    presets: &HashMap<String, Preset>,
-) -> Result<Vec<Value>, Error> {
-    let mut keys: Vec<String> = presets
-        .keys()
-        .map(|key| key.clone().to_string())
-        .collect();
+pub(crate) fn get_preset_names(presets: &HashMap<String, Preset>) -> Result<Vec<Value>, Error> {
+    let mut keys: Vec<String> = presets.keys().map(|key| key.clone().to_string()).collect();
     keys.sort();
     Ok(keys.into_iter().map(|s| Value::from(s)).collect())
 }
