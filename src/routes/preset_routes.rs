@@ -6,12 +6,12 @@ use crate::models::data_thread_models::{
 use rocket::http::Status;
 use rocket::serde::json::Json;
 use rocket::State;
-use serde_json::{json, Value};
+use serde_json::json;
 #[get("/preset/set/<preset_name>")]
-pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) -> ApiResponse {
+pub(crate) fn set_preset_route(preset_name: &str, channels: &State<Channels>) -> ApiResponse {
     if channels
         .route_to_data_sender
-        .send(Preset(PresetCommand::Set(preset_name.clone())))
+        .send(Preset(PresetCommand::Set(preset_name.parse().unwrap())))
         .is_err()
     {
         return ApiResponse {
@@ -26,15 +26,15 @@ pub(crate) fn set_preset_route(preset_name: String, channels: &State<Channels>) 
         .expect("Got data from channel")
         .recv()
     {
-        Err(_) => ApiResponse {
+        Ok(DataThreadResponse::Value(result)) => ApiResponse {
+            value: Json(result),
+            status: Status::Ok,
+        },
+        Err(_) | _ => ApiResponse {
             value: Json(
                 json!({"Error": format!("Could not find preset to set: {}", &preset_name)}),
             ),
             status: Status::NotFound,
-        },
-        _ => ApiResponse {
-            value: Json(Value::from(true)),
-            status: Status::Ok,
         },
     }
 }

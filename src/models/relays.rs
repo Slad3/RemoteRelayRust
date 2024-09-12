@@ -7,6 +7,7 @@ use std::io::{Error, ErrorKind};
 use std::vec;
 
 use crate::utils::kasa_plug_network_functions;
+use crate::utils::kasa_plug_network_functions::{MultiPlugStatus, PlugMutateResponse, PlugStatus};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RelayType {
@@ -65,7 +66,8 @@ impl KasaPlug {
     }
 
     pub(crate) fn connected(&mut self) -> Result<bool, Error> {
-        self.get_status()
+        let _ = self.get_status();
+        Ok(true)
     }
 
     pub fn to_json(&self) -> Value {
@@ -81,20 +83,16 @@ impl KasaPlug {
 
     pub fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
-        kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()).map(|result| {
-            let relay_state = result["system"]["get_sysinfo"]["relay_state"]
-                .as_u64()
-                .unwrap_or(0)
-                == 1;
-            self.status = relay_state;
-            relay_state
-        })
+        let response = kasa_plug_network_functions::send::<PlugStatus>(&self.ip, &cmd.to_string())?;
+        let relay_state = response.system.get_sysinfo.relay_state == 1;
+        self.status = relay_state;
+        Ok(relay_state)
     }
 
     pub fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
 
-        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
+        match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
             Ok(..) => {
                 self.status = false;
                 Ok(self.to_json())
@@ -108,7 +106,7 @@ impl KasaPlug {
 
     pub fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
-        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
+        match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
             Ok(..) => {
                 self.status = true;
                 Ok(self.to_json())
@@ -137,35 +135,39 @@ impl std::fmt::Display for KasaPlug {
 impl KasaMultiPlug {
     pub fn new(ip: String, names: Vec<String>, room: String) -> Vec<KasaMultiPlug> {
         let command = json!({"system": {"get_sysinfo": {}}});
-        let response = kasa_plug_network_functions::send(ip.clone(), command.to_string())
-            .expect(&format!("Unable to connect to KasaMultiPlug {}", ip));
+        let response =
+            kasa_plug_network_functions::send::<MultiPlugStatus>(&ip, &command.to_string())
+                .expect(&format!("Unable to connect to KasaMultiPlug {}", ip));
 
-        response["system"]["get_sysinfo"]["children"]
-            .as_array()
-            .map(|children| {
-                children
-                    .iter()
-                    .zip(names.iter())
-                    .map(|(child, name)| {
-                        let id = child["id"].to_string()[1..child["id"].to_string().len() - 1]
-                            .to_string();
-                        let state = child["state"].as_u64().unwrap_or(0) == 1;
-                        KasaMultiPlug {
-                            ip: ip.clone(),
-                            id,
-                            name: name.clone(),
-                            status: state,
-                            room: room.clone().parse().unwrap(),
-                            tags: Vec::new(),
-                        }
-                    })
-                    .collect()
+        let mut multi_plug_children: Vec<KasaMultiPlug> = Vec::new();
+
+        for (child, name) in response
+            .system
+            .get_sysinfo
+            .children
+            .iter()
+            .zip(names.iter())
+        {
+            let id = child.id.to_string()[1..child.id.to_string().len() - 1].to_string();
+
+            multi_plug_children.push(KasaMultiPlug {
+                ip: ip.clone(),
+                id,
+                name: name.clone(),
+                status: child.state == 1,
+                room: room.clone().parse().unwrap(),
+                tags: Vec::new(),
             })
-            .unwrap_or_default()
+        }
+
+        multi_plug_children
     }
 
     pub(crate) fn connected(&mut self) -> Result<bool, Error> {
-        self.get_status()
+        let command = json!({"system": {"get_sysinfo": {}}});
+        let _ =
+            kasa_plug_network_functions::send::<MultiPlugStatus>(&self.ip, &command.to_string())?;
+        Ok(true)
     }
 
     pub fn to_json(&self) -> Value {
@@ -182,25 +184,27 @@ impl KasaMultiPlug {
 
     pub fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
+        let result =
+            kasa_plug_network_functions::send::<MultiPlugStatus>(&self.ip, &cmd.to_string())?;
 
-        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
-            Ok(result) => {
-                let relay_state = result["system"]["get_sysinfo"].as_u64().unwrap_or(0) == 1;
-
+        for child in result.system.get_sysinfo.children {
+            if child.id == self.id {
+                let relay_state = child.state == 1;
                 self.status = relay_state;
-                Ok(true)
+                return Ok(relay_state);
             }
-            Err(..) => Err(Error::new(
-                ErrorKind::ConnectionRefused,
-                "Can't Connect To Plug".to_string(),
-            )),
         }
+
+        Err(Error::new(
+            ErrorKind::NotFound,
+            "Can't Connect to To Plug".to_string(),
+        ))
     }
 
     pub fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 0}}});
-        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
-            Ok(..) => {
+        match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
+            Ok(_) => {
                 self.status = false;
                 Ok(self.to_json())
             }
@@ -213,7 +217,7 @@ impl KasaMultiPlug {
 
     pub fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 1}}});
-        match kasa_plug_network_functions::send(self.ip.clone(), cmd.to_string()) {
+        match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
             Ok(..) => {
                 self.status = true;
                 Ok(self.to_json())
@@ -235,7 +239,6 @@ impl KasaMultiPlug {
 
 #[cfg(test)]
 mod tests {
-
     use crate::models::relays::KasaMultiPlug;
 
     #[test]

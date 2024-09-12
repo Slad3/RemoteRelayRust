@@ -31,7 +31,8 @@ pub(crate) fn handle_command_input(input: &str) -> Option<RelayCommands> {
 pub(crate) fn unwrap_response(package: DataThreadResponse) -> Json<Value> {
     match package {
         DataThreadResponse::Value(value) => Json(value),
-        _ => Json(json!( {"Error": ""})),
+        DataThreadResponse::Bool(bool) => Json(Value::from(bool)),
+        _ => Json(json!( {"Error": "Unrecognized response type."})),
     }
 }
 
@@ -53,9 +54,9 @@ fn handle_relay_command(
                 RelayType::KasaPlug(plug) => plug.turn_off()?,
                 RelayType::KasaMultiPlug(plug) => plug.turn_off()?,
             })),
-            RelayCommands::STATUS => Ok(DataThreadResponse::Bool(match relay {
-                RelayType::KasaPlug(plug) => plug.get_status()?,
-                RelayType::KasaMultiPlug(plug) => plug.get_status()?,
+            RelayCommands::STATUS => Ok(DataThreadResponse::Value(match relay {
+                RelayType::KasaPlug(plug) => json!({"status": plug.get_status()?}),
+                RelayType::KasaMultiPlug(plug) => json!({"status": plug.get_status()?}),
             })),
         }
     } else {
@@ -76,10 +77,11 @@ fn handle_preset_command(
         },
         PresetCommand::Set(preset_name) => match presets.get_mut(&preset_name) {
             Some(preset) => match set_preset(preset, relays) {
-                Ok(boolean) => {
+                Ok(value) => {
                     let mut temp_current_preset = current_preset.lock().unwrap();
                     *temp_current_preset = preset.name.clone().to_string();
-                    Ok(DataThreadResponse::Bool(boolean))
+                    println!("{}", &value);
+                    Ok(DataThreadResponse::Value(value))
                 }
                 Err(error) => Err(error),
             },

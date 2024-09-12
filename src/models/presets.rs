@@ -1,6 +1,6 @@
 use crate::models::relays::RelayType;
 use rocket::serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::Error;
 
@@ -14,7 +14,7 @@ pub struct Preset {
 pub(crate) fn set_preset(
     preset: &Preset,
     relays: &mut HashMap<String, RelayType>,
-) -> Result<bool, Error> {
+) -> Result<Value, Error> {
     for (relay_name, relay) in relays.iter_mut() {
         match preset.relays.get_key_value(relay_name) {
             Some((_, &value)) => {
@@ -42,7 +42,7 @@ pub(crate) fn set_preset(
         }
     }
 
-    Ok(true)
+    Ok(json!({"presetSet": true}))
 }
 
 pub(crate) fn get_preset_names(presets: &HashMap<String, Preset>) -> Result<Vec<Value>, Error> {
