@@ -98,7 +98,7 @@ pub_struct!(PlugMutateSystem {
     set_relay_state: ErrCode,
 });
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ErrCode {
+#[rustfmt::skip]
+pub_struct!(ErrCode {
     err_code: i32,
-}
+});
