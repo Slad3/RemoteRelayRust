@@ -6,8 +6,8 @@ use serde_json::json;
 use std::io::{Error, ErrorKind};
 use std::vec;
 
+use crate::models::kasa_network_models::{MultiPlugStatus, PlugMutateResponse, PlugStatus};
 use crate::utils::kasa_plug_network_functions;
-use crate::utils::kasa_plug_network_functions::{MultiPlugStatus, PlugMutateResponse, PlugStatus};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum RelayType {
