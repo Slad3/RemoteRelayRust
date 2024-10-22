@@ -1,6 +1,8 @@
 use crate::models::config_models::Config;
 use crate::models::presets::Preset;
-use crate::models::relays::{ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug, RelayType};
+use crate::models::relays::{
+    ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug, RelayActions, RelayType,
+};
 use dotenv::dotenv;
 use mongodb::{bson::doc, options::ClientOptions, Client};
 use mongodb::{Collection, Database};

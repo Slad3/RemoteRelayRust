@@ -2,8 +2,8 @@ use std::collections::HashMap;
 
 use crate::models::config_models::Config;
 use crate::models::presets::Preset;
-use crate::models::relays::RelayType;
 use crate::models::relays::{ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug};
+use crate::models::relays::{RelayActions, RelayType};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::fs;

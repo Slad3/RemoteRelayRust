@@ -8,7 +8,7 @@ use rocket::State;
 use serde_json::json;
 
 #[get("/")]
-pub fn index_route() -> ApiResponse {
+pub async fn index_route() -> ApiResponse {
     ApiResponse {
         value: Json(json!( {"HealthCheck": true})),
         status: Status::Ok,
@@ -16,7 +16,7 @@ pub fn index_route() -> ApiResponse {
 }
 
 #[get("/status")]
-pub fn status_route(channels: &State<Channels>) -> ApiResponse {
+pub async fn status_route(channels: &State<Channels>) -> ApiResponse {
     let error_message = ApiResponse {
         value: Json(json!({"Error": "Could not get preset names"})),
         status: Status::new(500),
@@ -41,7 +41,7 @@ pub fn status_route(channels: &State<Channels>) -> ApiResponse {
 }
 
 #[get("/refresh")]
-pub fn refresh_route(channels: &State<Channels>) -> ApiResponse {
+pub async fn refresh_route(channels: &State<Channels>) -> ApiResponse {
     let error_message = ApiResponse {
         value: Json(json!({"Error": "Could not refresh config"})),
         status: Status::new(500),

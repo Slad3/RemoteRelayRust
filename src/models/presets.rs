@@ -1,4 +1,4 @@
-use crate::models::relays::RelayType;
+use crate::models::relays::{RelayActions, RelayType};
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -19,25 +19,13 @@ pub(crate) fn set_preset(
         match preset.relays.get_key_value(relay_name) {
             Some((_, &value)) => {
                 if value {
-                    match relay {
-                        RelayType::KasaPlug(plug) => plug.turn_on(),
-                        RelayType::KasaMultiPlug(plug) => plug.turn_on(),
-                    }
-                    .expect("Couldn't turn on");
+                    relay.turn_on().expect("Couldn't turn on");
                 } else {
-                    match relay {
-                        RelayType::KasaPlug(plug) => plug.turn_off(),
-                        RelayType::KasaMultiPlug(plug) => plug.turn_off(),
-                    }
-                    .expect("Couldn't turn off");
+                    relay.turn_off().expect("Couldn't turn off");
                 }
             }
             None => {
-                match relay {
-                    RelayType::KasaPlug(plug) => plug.turn_off(),
-                    RelayType::KasaMultiPlug(plug) => plug.turn_off(),
-                }
-                .expect("Couldn't turn off");
+                relay.turn_off().expect("Couldn't turn off");
             }
         }
     }

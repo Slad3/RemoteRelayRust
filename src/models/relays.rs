@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::fmt::Debug;
 
 use rocket::serde::Deserialize;
 use serde::Serialize;
@@ -52,6 +53,20 @@ pub struct KasaMultiPlug {
     pub(crate) tags: Vec<String>,
 }
 
+pub trait RelayActions<'a>: Debug + Deserialize<'a> + Serialize {
+    fn connected(&mut self) -> Result<bool, Error>;
+
+    fn to_json(&self) -> Value;
+
+    fn get_status(&mut self) -> Result<bool, Error>;
+
+    fn turn_off(&mut self) -> Result<Value, Error>;
+
+    fn turn_on(&mut self) -> Result<Value, Error>;
+
+    fn switch(&mut self) -> Result<Value, Error>;
+}
+
 impl KasaPlug {
     pub fn new(ip: String, name: String, room: String) -> Self {
         let tags: Vec<String> = Vec::new();
@@ -64,13 +79,15 @@ impl KasaPlug {
         };
         plug
     }
+}
 
-    pub(crate) fn connected(&mut self) -> Result<bool, Error> {
+impl RelayActions<'_> for KasaPlug {
+    fn connected(&mut self) -> Result<bool, Error> {
         let _ = self.get_status();
         Ok(true)
     }
 
-    pub fn to_json(&self) -> Value {
+    fn to_json(&self) -> Value {
         json!({
             "type": "Kasa Plug",
             "ip": &self.ip,
@@ -81,7 +98,7 @@ impl KasaPlug {
         })
     }
 
-    pub fn get_status(&mut self) -> Result<bool, Error> {
+    fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
         let response = kasa_plug_network_functions::send::<PlugStatus>(&self.ip, &cmd.to_string())?;
         let relay_state = response.system.get_sysinfo.relay_state == 1;
@@ -89,7 +106,7 @@ impl KasaPlug {
         Ok(relay_state)
     }
 
-    pub fn turn_off(&mut self) -> Result<Value, Error> {
+    fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 0}}});
 
         match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
@@ -104,7 +121,7 @@ impl KasaPlug {
         }
     }
 
-    pub fn turn_on(&mut self) -> Result<Value, Error> {
+    fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"system": {"set_relay_state": {"state": 1}}});
         match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
             Ok(..) => {
@@ -118,17 +135,11 @@ impl KasaPlug {
         }
     }
 
-    pub fn switch(&mut self) -> Result<Value, Error> {
+    fn switch(&mut self) -> Result<Value, Error> {
         match self.status {
             true => self.turn_off(),
             false => self.turn_on(),
         }
-    }
-}
-
-impl std::fmt::Display for KasaPlug {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.name)
     }
 }
 
@@ -162,15 +173,17 @@ impl KasaMultiPlug {
 
         multi_plug_children
     }
+}
 
-    pub(crate) fn connected(&mut self) -> Result<bool, Error> {
+impl RelayActions<'_> for KasaMultiPlug {
+    fn connected(&mut self) -> Result<bool, Error> {
         let command = json!({"system": {"get_sysinfo": {}}});
         let _ =
             kasa_plug_network_functions::send::<MultiPlugStatus>(&self.ip, &command.to_string())?;
         Ok(true)
     }
 
-    pub fn to_json(&self) -> Value {
+    fn to_json(&self) -> Value {
         json!({
             "type": "Kasa Plug",
             "ip": &self.ip,
@@ -182,7 +195,7 @@ impl KasaMultiPlug {
         })
     }
 
-    pub fn get_status(&mut self) -> Result<bool, Error> {
+    fn get_status(&mut self) -> Result<bool, Error> {
         let cmd = json!({"system": {"get_sysinfo": {}}});
         let result =
             kasa_plug_network_functions::send::<MultiPlugStatus>(&self.ip, &cmd.to_string())?;
@@ -201,7 +214,7 @@ impl KasaMultiPlug {
         ))
     }
 
-    pub fn turn_off(&mut self) -> Result<Value, Error> {
+    fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 0}}});
         match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
             Ok(_) => {
@@ -215,7 +228,7 @@ impl KasaMultiPlug {
         }
     }
 
-    pub fn turn_on(&mut self) -> Result<Value, Error> {
+    fn turn_on(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 1}}});
         match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
             Ok(..) => {
@@ -229,7 +242,7 @@ impl KasaMultiPlug {
         }
     }
 
-    pub fn switch(&mut self) -> Result<Value, Error> {
+    fn switch(&mut self) -> Result<Value, Error> {
         match self.status {
             true => self.turn_off(),
             false => self.turn_on(),
@@ -237,9 +250,53 @@ impl KasaMultiPlug {
     }
 }
 
+impl RelayActions<'_> for RelayType {
+    fn connected(&mut self) -> Result<bool, Error> {
+        match self {
+            RelayType::KasaPlug(relay_plug) => relay_plug.connected(),
+            RelayType::KasaMultiPlug(relay_plug) => relay_plug.connected(),
+        }
+    }
+
+    fn to_json(&self) -> Value {
+        match self {
+            RelayType::KasaPlug(relay_plug) => relay_plug.to_json(),
+            RelayType::KasaMultiPlug(relay_plug) => relay_plug.to_json(),
+        }
+    }
+
+    fn get_status(&mut self) -> Result<bool, Error> {
+        match self {
+            RelayType::KasaPlug(relay_plug) => relay_plug.get_status(),
+            RelayType::KasaMultiPlug(relay_plug) => relay_plug.get_status(),
+        }
+    }
+
+    fn turn_off(&mut self) -> Result<Value, Error> {
+        match self {
+            RelayType::KasaPlug(relay_plug) => relay_plug.turn_off(),
+            RelayType::KasaMultiPlug(relay_plug) => relay_plug.turn_off(),
+        }
+    }
+
+    fn turn_on(&mut self) -> Result<Value, Error> {
+        match self {
+            RelayType::KasaPlug(relay_plug) => relay_plug.turn_on(),
+            RelayType::KasaMultiPlug(relay_plug) => relay_plug.turn_on(),
+        }
+    }
+
+    fn switch(&mut self) -> Result<Value, Error> {
+        match self {
+            RelayType::KasaPlug(relay_plug) => relay_plug.switch(),
+            RelayType::KasaMultiPlug(relay_plug) => relay_plug.switch(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::models::relays::KasaMultiPlug;
+    use crate::models::relays::{KasaMultiPlug, RelayActions};
 
     #[test]
     fn test_multiplug_stuff() {

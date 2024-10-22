@@ -1,6 +1,6 @@
 [package]
 authors = ["Slad3"]
-description = "A new type of shell"
+description = "Http server that allows a user to control their in-home smartplugs (and other forms of relays with a boolean state) externally from the respective smartplug's ecosystem. Rebuilt in Rust."
 edition = "2021"
 homepage = "https://github.com/Slad3/RemoteRelayRust"
 license = "MIT"

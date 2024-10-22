@@ -4,7 +4,7 @@ use crate::models::data_thread_models::{
     DataThreadCommand, DataThreadResponse, PresetCommand, RelayCommand, RelayCommands,
 };
 use crate::models::presets::{get_preset_names, set_preset, Preset};
-use crate::models::relays::RelayType;
+use crate::models::relays::{RelayActions, RelayType};
 
 use crate::utils::load_config::{load_config, ConfigLocation};
 
@@ -42,22 +42,12 @@ fn handle_relay_command(
 ) -> Result<DataThreadResponse, Error> {
     if let Some(relay) = relays.get_mut(&relay_command.name) {
         match relay_command.command {
-            RelayCommands::SWITCH => Ok(DataThreadResponse::Value(match relay {
-                RelayType::KasaPlug(plug) => plug.switch()?,
-                RelayType::KasaMultiPlug(plug) => plug.switch()?,
-            })),
-            RelayCommands::TRUE => Ok(DataThreadResponse::Value(match relay {
-                RelayType::KasaPlug(plug) => plug.turn_on()?,
-                RelayType::KasaMultiPlug(plug) => plug.turn_on()?,
-            })),
-            RelayCommands::FALSE => Ok(DataThreadResponse::Value(match relay {
-                RelayType::KasaPlug(plug) => plug.turn_off()?,
-                RelayType::KasaMultiPlug(plug) => plug.turn_off()?,
-            })),
-            RelayCommands::STATUS => Ok(DataThreadResponse::Value(match relay {
-                RelayType::KasaPlug(plug) => json!({"status": plug.get_status()?}),
-                RelayType::KasaMultiPlug(plug) => json!({"status": plug.get_status()?}),
-            })),
+            RelayCommands::SWITCH => Ok(DataThreadResponse::Value(relay.switch()?)),
+            RelayCommands::TRUE => Ok(DataThreadResponse::Value(relay.turn_on()?)),
+            RelayCommands::FALSE => Ok(DataThreadResponse::Value(relay.turn_off()?)),
+            RelayCommands::STATUS => Ok(DataThreadResponse::Value(
+                json!({"status": relay.get_status()?}),
+            )),
         }
     } else {
         Ok(DataThreadResponse::Bool(false))
@@ -80,7 +70,6 @@ fn handle_preset_command(
                 Ok(value) => {
                     let mut temp_current_preset = current_preset.lock().unwrap();
                     *temp_current_preset = preset.name.clone().to_string();
-                    println!("{}", &value);
                     Ok(DataThreadResponse::Value(value))
                 }
                 Err(error) => Err(error),
@@ -118,10 +107,7 @@ pub(crate) fn get_status(
     let mut rooms: HashSet<String> = HashSet::new();
 
     for (_, relay) in relays.iter() {
-        relay_statuses.push(match relay {
-            RelayType::KasaPlug(plug) => plug.to_json(),
-            RelayType::KasaMultiPlug(plug) => plug.to_json(),
-        });
+        relay_statuses.push(relay.to_json());
 
         rooms.insert(match relay {
             RelayType::KasaPlug(plug) => plug.room.clone(),

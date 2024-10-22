@@ -10,7 +10,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 
 #[get("/relay/<relay_name>/<command_input>")]
-pub(crate) fn set_relay_command_route(
+pub(crate) async fn set_relay_command_route(
     relay_name: &str,
     command_input: &str,
     channels: &State<Channels>,

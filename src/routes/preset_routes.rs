@@ -8,7 +8,7 @@ use rocket::serde::json::Json;
 use rocket::State;
 use serde_json::json;
 #[get("/preset/set/<preset_name>")]
-pub(crate) fn set_preset_route(preset_name: &str, channels: &State<Channels>) -> ApiResponse {
+pub(crate) async fn set_preset_route(preset_name: &str, channels: &State<Channels>) -> ApiResponse {
     if channels
         .route_to_data_sender
         .send(Preset(PresetCommand::Set(preset_name.parse().unwrap())))
@@ -40,7 +40,7 @@ pub(crate) fn set_preset_route(preset_name: &str, channels: &State<Channels>) ->
 }
 
 #[get("/preset/getPresetNames")]
-pub(crate) fn get_preset_names_route(channels: &State<Channels>) -> ApiResponse {
+pub(crate) async fn get_preset_names_route(channels: &State<Channels>) -> ApiResponse {
     let error_message = ApiResponse {
         value: Json(json!({"Error": "Could not get preset names"})),
         status: Status::ExpectationFailed,
