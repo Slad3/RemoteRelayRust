@@ -39,8 +39,17 @@ pub(crate) fn unwrap_response(package: DataThreadResponse) -> Json<Value> {
 fn handle_relay_command(
     relay_command: RelayCommand,
     relays: &mut HashMap<String, RelayType>,
+    current_preset: &Mutex<String>,
 ) -> Result<DataThreadResponse, Error> {
     if let Some(relay) = relays.get_mut(&relay_command.name) {
+        match relay_command.command {
+            RelayCommands::SWITCH | RelayCommands::TRUE | RelayCommands::FALSE => {
+                let mut temp_current_preset = current_preset.lock().unwrap();
+                *temp_current_preset = "Custom".to_string()
+            }
+            _ => {}
+        }
+
         match relay_command.command {
             RelayCommands::SWITCH => Ok(DataThreadResponse::Value(relay.switch()?)),
             RelayCommands::TRUE => Ok(DataThreadResponse::Value(relay.turn_on()?)),
@@ -86,7 +95,7 @@ fn handle_command(
     current_preset: &Mutex<String>,
 ) -> Result<DataThreadResponse, Error> {
     match received {
-        DataThreadCommand::Relay(relay_command) => handle_relay_command(relay_command, relays),
+        DataThreadCommand::Relay(relay_command) => handle_relay_command(relay_command, relays, current_preset),
         DataThreadCommand::Preset(preset_command) => {
             handle_preset_command(preset_command, relays, presets, current_preset)
         }

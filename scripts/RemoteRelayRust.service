@@ -1,0 +1,12 @@
+[Unit]
+Description=Remote Relay Rust Server
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory =
+ExecStart= /usr/bin/sudo ./target/release/remote_relay_rust --config=mongodb
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
