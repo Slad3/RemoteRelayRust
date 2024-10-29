@@ -159,11 +159,9 @@ impl KasaMultiPlug {
             .iter()
             .zip(names.iter())
         {
-            let id = child.id.to_string()[1..child.id.to_string().len() - 1].to_string();
-
             multi_plug_children.push(KasaMultiPlug {
                 ip: ip.clone(),
-                id,
+                id: child.id.to_string(),
                 name: name.clone(),
                 status: child.state == 1,
                 room: room.clone().parse().unwrap(),
@@ -217,7 +215,7 @@ impl RelayActions<'_> for KasaMultiPlug {
     fn turn_off(&mut self) -> Result<Value, Error> {
         let cmd = json!({"context": {"child_ids": [self.id.clone()]}, "system": {"set_relay_state": {"state": 0}}});
         match kasa_plug_network_functions::send::<PlugMutateResponse>(&self.ip, &cmd.to_string()) {
-            Ok(_) => {
+            Ok(..) => {
                 self.status = false;
                 Ok(self.to_json())
             }
@@ -311,6 +309,10 @@ mod tests {
             "Bedroom".parse().unwrap(),
         );
         assert_eq!(plugs.len(), 2);
+
+        for plug in &plugs {
+            println!("{} \t {}", &plug.name, &plug.id);
+        }
 
         plugs
             .get_mut(0)
