@@ -15,6 +15,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::sync::Mutex;
 use std::thread;
 use std::thread::JoinHandle;
+use std::time::Duration;
 
 pub(crate) fn handle_command_input(input: &str) -> Option<RelayCommands> {
     match input.to_uppercase().as_str() {
@@ -95,7 +96,9 @@ fn handle_command(
     current_preset: &Mutex<String>,
 ) -> Result<DataThreadResponse, Error> {
     match received {
-        DataThreadCommand::Relay(relay_command) => handle_relay_command(relay_command, relays, current_preset),
+        DataThreadCommand::Relay(relay_command) => {
+            handle_relay_command(relay_command, relays, current_preset)
+        }
         DataThreadCommand::Preset(preset_command) => {
             handle_preset_command(preset_command, relays, presets, current_preset)
         }
@@ -131,12 +134,30 @@ pub(crate) fn get_status(
     Ok(result)
 }
 
+#[allow(unused)]
+fn setup_update_thread(
+    route_to_data_sender: Sender<DataThreadCommand>,
+    refresh_time: u64,
+) -> JoinHandle<bool> {
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(refresh_time));
+        route_to_data_sender
+            .send(DataThreadCommand::Refresh)
+            .expect("Unable to send refresh command");
+    })
+}
+
 pub(crate) fn setup_data_thread(
     sender: Sender<DataThreadResponse>,
     receiver: Receiver<DataThreadCommand>,
+    route_to_data_sender: Sender<DataThreadCommand>,
     config_location: ConfigLocation,
 ) -> JoinHandle<()> {
-    let loaded_config = load_config(config_location).expect("Could not set up thread");
+    let loaded_config = load_config(config_location)
+        .join()
+        .expect("Could not set up thread")
+        .unwrap();
+
     thread::spawn(move || {
         let mut relays: HashMap<String, RelayType> = loaded_config.relays;
         let mut presets: HashMap<String, Preset> = loaded_config.presets;
@@ -152,10 +173,15 @@ pub(crate) fn setup_data_thread(
             println!("\t{preset_name}");
         }
 
+        // setup_update_thread(route_to_data_sender.clone(), 3);
+
         for received in receiver {
             match received {
-                DataThreadCommand::Refresh => match load_config(config_location) {
-                    Ok(config) => {
+                DataThreadCommand::Refresh => match load_config(config_location).join() {
+                    Ok(config_handler) => {
+                        let config = config_handler.unwrap();
+                        println!("Refresh Relays: {}", &config.relays.len());
+
                         relays = config.relays;
                         presets = config.presets;
                         sender

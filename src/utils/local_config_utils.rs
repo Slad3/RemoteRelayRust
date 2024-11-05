@@ -15,14 +15,10 @@ pub struct LoadedConfig {
 }
 
 pub fn load_config_from_file() -> Result<LoadedConfig, std::io::Error> {
-    let data = fs::read_to_string("config.json");
-
-    if data.is_err() {
-        panic!("Couldn't find 'config.json'")
+    match fs::read_to_string("config.json") {
+        Err(_) => panic!("Couldn't find 'config.json'"),
+        Ok(data) => Ok(from_str(data.as_str())?),
     }
-
-    let configuration = from_str(data?.as_str())?;
-    Ok(configuration)
 }
 
 fn load_relays(from_config: Vec<ConfigRelay>) -> HashMap<String, RelayType> {
@@ -43,7 +39,6 @@ fn load_relays(from_config: Vec<ConfigRelay>) -> HashMap<String, RelayType> {
                 let mut plug = KasaPlug::new(relay.ip, relay.name, relay.room);
                 match plug.connected() {
                     Ok(_) => {
-                        let _ = plug.get_status();
                         relays.insert(plug.name.clone(), RelayType::KasaPlug(plug));
                     }
                     Err(error) => {
@@ -104,11 +99,13 @@ mod tests {
     fn test_loading_relays_formatted_success() {
         let loaded_config = load_config_from_file().expect("Config File Not Found");
         let relays = load_relays(loaded_config.relays);
+        assert!(!relays.is_empty())
     }
 
     #[test]
     fn test_loading_presets_formatted_success() {
         let loaded_config = load_config_from_file().expect("Config File Not Found");
         let presets = load_presets(loaded_config.presets);
+        assert!(!presets.is_empty())
     }
 }

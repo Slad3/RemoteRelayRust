@@ -70,21 +70,19 @@ pub trait RelayActions<'a>: Debug + Deserialize<'a> + Serialize {
 impl KasaPlug {
     pub fn new(ip: String, name: String, room: String) -> Self {
         let tags: Vec<String> = Vec::new();
-        let plug = KasaPlug {
+        KasaPlug {
             ip,
             name,
             status: false,
             tags,
             room,
-        };
-        plug
+        }
     }
 }
 
 impl RelayActions<'_> for KasaPlug {
     fn connected(&mut self) -> Result<bool, Error> {
-        let _ = self.get_status();
-        Ok(true)
+        self.get_status()
     }
 
     fn to_json(&self) -> Value {
@@ -294,7 +292,13 @@ impl RelayActions<'_> for RelayType {
 
 #[cfg(test)]
 mod tests {
-    use crate::models::relays::{KasaMultiPlug, RelayActions};
+    use crate::models::relays::{KasaMultiPlug, KasaPlug, RelayActions};
+
+    // #[test]
+    // fn test_singleplug_timeouts() {
+    //     let mut plug = KasaPlug::new("192.168.0.107".to_string(), "ScentLight".to_string(), "bedroom".to_string());
+    //     println!("{:?}", &plug.connected());
+    // }
 
     #[test]
     fn test_multiplug_stuff() {

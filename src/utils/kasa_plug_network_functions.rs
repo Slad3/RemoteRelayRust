@@ -4,7 +4,11 @@ use serde_json::Value;
 use std::convert::TryFrom;
 use std::io::{Error, ErrorKind, Read, Write};
 use std::net::TcpStream;
+use std::net::ToSocketAddrs;
+use std::time::Duration;
 use std::vec;
+
+const TIMEOUT: Duration = Duration::from_millis(100);
 
 pub fn decrypt(string: Vec<u8>) -> String {
     let key: u8 = 171;
@@ -33,9 +37,13 @@ pub fn encrypt(string: &String) -> Vec<u8> {
 
 pub fn send<T: serde::de::DeserializeOwned>(ip: &String, cmd: &String) -> Result<T, Error> {
     const PORT: u16 = 9999;
-    let timeout = 1;
-    let mut stream = TcpStream::connect((ip.clone(), PORT))?;
-    let _ = stream.set_read_timeout(Some(std::time::Duration::from_secs(timeout)));
+    let addr = (ip.as_str(), PORT)
+        .to_socket_addrs()?
+        .next()
+        .ok_or_else(|| Error::new(ErrorKind::InvalidInput, "Invalid IP address"))?;
+
+    let mut stream = TcpStream::connect_timeout(&addr, TIMEOUT)?;
+
     let encrypted = encrypt(cmd);
     stream.write_all(&encrypted)?;
     let mut data = vec![0; 4096];
@@ -47,7 +55,7 @@ pub fn send<T: serde::de::DeserializeOwned>(ip: &String, cmd: &String) -> Result
     let end_pos: i32 = b + 4i32;
 
     let decrypted = decrypt(data[4..end_pos as usize].to_vec());
-    let json_data: T = serde_json::from_str::<T>(&decrypted.as_str()).expect("Cannot parse");
+    let json_data: T = serde_json::from_str::<T>(&decrypted.as_str())?;
     Ok(json_data)
 }
 

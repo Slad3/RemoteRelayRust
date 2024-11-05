@@ -48,14 +48,16 @@ async fn rocket() -> _ {
     let (route_to_data_sender, route_to_data_receiver) = mpsc::channel::<DataThreadCommand>();
     let (data_to_route_sender, data_to_route_receiver) = mpsc::channel::<DataThreadResponse>();
 
+    // let rtds = route_to_data_sender.clone();
     let channels = Channels {
-        route_to_data_sender,
+        route_to_data_sender: route_to_data_sender.clone().clone(),
         data_to_route_receiver: Arc::new(Mutex::new(data_to_route_receiver)),
     };
 
     let data_thread = setup_data_thread(
         data_to_route_sender,
         route_to_data_receiver,
+        route_to_data_sender.clone(),
         config_location,
     );
 

@@ -156,6 +156,8 @@ mod tests {
         let relays = find_mongo_relays(&home_config)
             .await
             .expect("Could not get Mongo relays");
+
+        assert!(!relays.is_empty())
     }
 
     #[tokio::test]
@@ -171,5 +173,6 @@ mod tests {
         let presets = find_mongo_presets(&home_config)
             .await
             .expect("Could not get Mongo presets");
+        assert!(!presets.is_empty())
     }
 }
