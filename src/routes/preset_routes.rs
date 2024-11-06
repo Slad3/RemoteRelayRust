@@ -64,6 +64,6 @@ pub(crate) async fn get_preset_names_route(channels: &State<Channels>) -> ApiRes
             value: Json(final_response),
             status: Status::Ok,
         },
-        _ => error_message,
+        Err(_) | Ok(_) => error_message,
     }
 }

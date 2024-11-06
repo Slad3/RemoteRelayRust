@@ -50,7 +50,10 @@ pub fn send<T: serde::de::DeserializeOwned>(ip: &String, cmd: &String) -> Result
     stream.read(&mut data)?;
 
     let a_ref: &[u8] = &data[..4];
-    let b = i32::from_be_bytes(<[u8; 4]>::try_from(a_ref).expect("Unable to parse bytes"));
+    let b = match <[u8; 4]>::try_from(a_ref) {
+        Ok(result) => i32::from_be_bytes(result),
+        Err(error) => return Err(Error::new(ErrorKind::InvalidData, error)),
+    };
 
     let end_pos: i32 = b + 4i32;
 

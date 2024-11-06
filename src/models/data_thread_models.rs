@@ -8,28 +8,29 @@ pub(crate) enum DataThreadResponse {
     Error(String),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) enum DataThreadCommand {
     SystemStatus,
+    AutoRefresh,
     Refresh,
     Relay(RelayCommand),
     Preset(PresetCommand),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) struct RelayCommand {
     pub(crate) name: String,
     pub(crate) command: RelayCommands,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) enum PresetCommand {
     Set(String),
     Names,
     // CurrentPreset,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub(crate) enum RelayCommands {
     #[serde(rename = "true")]
     TRUE,

@@ -29,9 +29,11 @@ fn load_relays(from_config: Vec<ConfigRelay>) -> HashMap<String, RelayType> {
             ConfigRelayType::KasaMultiPlug => {
                 let plugs = KasaMultiPlug::new(relay.ip, relay.names, relay.room);
 
-                for mut plug in plugs {
-                    if plug.connected().is_ok() {
-                        relays.insert(plug.name.clone(), RelayType::KasaMultiPlug(plug));
+                if plugs.is_ok() {
+                    for mut plug in plugs.unwrap() {
+                        if plug.connected().is_ok() {
+                            relays.insert(plug.name.clone(), RelayType::KasaMultiPlug(plug));
+                        }
                     }
                 }
             }

@@ -18,7 +18,7 @@ pub async fn index_route() -> ApiResponse {
 #[get("/status")]
 pub async fn status_route(channels: &State<Channels>) -> ApiResponse {
     let error_message = ApiResponse {
-        value: Json(json!({"Error": "Could not get preset names"})),
+        value: Json(json!({"Error": "Could not get status"})),
         status: Status::new(500),
     };
 
@@ -36,7 +36,7 @@ pub async fn status_route(channels: &State<Channels>) -> ApiResponse {
             value: Json(final_response),
             status: Status::Ok,
         },
-        _ => error_message,
+        Err(_) | Ok(_) => error_message,
     }
 }
 

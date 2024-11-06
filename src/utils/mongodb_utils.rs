@@ -46,9 +46,11 @@ async fn find_mongo_relays(
                 let plugs =
                     KasaMultiPlug::new(relay.ip.clone(), relay.names.clone(), relay.room.clone());
 
-                for mut plug in plugs {
-                    if plug.connected().is_ok() {
-                        relays.insert(plug.name.clone(), RelayType::KasaMultiPlug(plug));
+                if plugs.is_ok() {
+                    for mut plug in plugs? {
+                        if plug.connected().is_ok() {
+                            relays.insert(plug.name.clone(), RelayType::KasaMultiPlug(plug));
+                        }
                     }
                 }
             }

@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::collections::HashMap;
 use std::fmt::Debug;
 
 use rocket::serde::Deserialize;
@@ -10,7 +11,7 @@ use std::vec;
 use crate::models::kasa_network_models::{MultiPlugStatus, PlugMutateResponse, PlugStatus};
 use crate::utils::kasa_plug_network_functions;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub enum RelayType {
     KasaPlug(KasaPlug),
     KasaMultiPlug(KasaMultiPlug),
@@ -34,7 +35,7 @@ pub(crate) struct ConfigRelay {
     pub(crate) room: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct KasaPlug {
     pub(crate) ip: String,
     pub(crate) name: String,
@@ -43,7 +44,7 @@ pub struct KasaPlug {
     pub(crate) tags: Vec<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct KasaMultiPlug {
     pub(crate) ip: String,
     pub(crate) id: String,
@@ -142,11 +143,18 @@ impl RelayActions<'_> for KasaPlug {
 }
 
 impl KasaMultiPlug {
-    pub fn new(ip: String, names: Vec<String>, room: String) -> Vec<KasaMultiPlug> {
+    pub fn new(ip: String, names: Vec<String>, room: String) -> Result<Vec<KasaMultiPlug>, Error> {
         let command = json!({"system": {"get_sysinfo": {}}});
         let response =
-            kasa_plug_network_functions::send::<MultiPlugStatus>(&ip, &command.to_string())
-                .expect(&format!("Unable to connect to KasaMultiPlug {}", ip));
+            match kasa_plug_network_functions::send::<MultiPlugStatus>(&ip, &command.to_string()) {
+                Ok(response) => response,
+                Err(..) => {
+                    return Err(Error::new(
+                        ErrorKind::NotConnected,
+                        format!("Unable to connect to KasaMultiPlug {}", ip),
+                    ))
+                }
+            };
 
         let mut multi_plug_children: Vec<KasaMultiPlug> = Vec::new();
 
@@ -167,7 +175,7 @@ impl KasaMultiPlug {
             })
         }
 
-        multi_plug_children
+        Ok(multi_plug_children)
     }
 }
 
@@ -290,9 +298,31 @@ impl RelayActions<'_> for RelayType {
     }
 }
 
+pub fn config_equals<T>(map1: &HashMap<String, T>, map2: &HashMap<String, T>) -> bool
+where
+    T: PartialEq,
+{
+    if map1.len() != map2.len() {
+        return false;
+    }
+
+    for (key, value1) in map1 {
+        match map2.get(key) {
+            Some(value2) => {
+                if value1 != value2 {
+                    return false;
+                }
+            }
+            None => return false,
+        }
+    }
+
+    true
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::models::relays::{KasaMultiPlug, KasaPlug, RelayActions};
+    use crate::models::relays::{KasaMultiPlug, RelayActions};
 
     // #[test]
     // fn test_singleplug_timeouts() {
@@ -311,7 +341,8 @@ mod tests {
                 "BedroomLight".parse().unwrap(),
             ],
             "Bedroom".parse().unwrap(),
-        );
+        )
+        .unwrap();
         assert_eq!(plugs.len(), 2);
 
         for plug in &plugs {

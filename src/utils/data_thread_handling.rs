@@ -1,10 +1,11 @@
+use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 
 use crate::models::data_thread_models::{
     DataThreadCommand, DataThreadResponse, PresetCommand, RelayCommand, RelayCommands,
 };
 use crate::models::presets::{get_preset_names, set_preset, Preset};
-use crate::models::relays::{RelayActions, RelayType};
+use crate::models::relays::{config_equals, RelayActions, RelayType};
 
 use crate::utils::load_config::{load_config, ConfigLocation};
 
@@ -12,7 +13,7 @@ use rocket::serde::json::Json;
 use serde_json::{json, Value};
 use std::io::{Error, ErrorKind};
 use std::sync::mpsc::{Receiver, Sender};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -107,6 +108,7 @@ fn handle_command(
             current_preset.lock().unwrap().to_string(),
         )?)),
         DataThreadCommand::Refresh => Ok(DataThreadResponse::Bool(false)),
+        DataThreadCommand::AutoRefresh => Ok(DataThreadResponse::Bool(false)),
     }
 }
 
@@ -141,9 +143,12 @@ fn setup_update_thread(
 ) -> JoinHandle<bool> {
     thread::spawn(move || loop {
         thread::sleep(Duration::from_secs(refresh_time));
-        route_to_data_sender
-            .send(DataThreadCommand::Refresh)
-            .expect("Unable to send refresh command");
+        if route_to_data_sender
+            .send(DataThreadCommand::AutoRefresh)
+            .is_err()
+        {
+            eprintln!("Unable to send refresh command");
+        }
     })
 }
 
@@ -159,48 +164,61 @@ pub(crate) fn setup_data_thread(
         .unwrap();
 
     thread::spawn(move || {
-        let mut relays: HashMap<String, RelayType> = loaded_config.relays;
-        let mut presets: HashMap<String, Preset> = loaded_config.presets;
-        let current_preset = Mutex::new("Custom".to_string());
+        let relays = Arc::new(Mutex::new(loaded_config.relays));
+        let presets = Arc::new(Mutex::new(loaded_config.presets));
+        let current_preset = Arc::new(Mutex::new("Custom".to_string()));
 
-        println!("Relays:");
-        for (relay_name, _) in relays.iter() {
-            println!("\t{relay_name}");
-        }
-
-        println!("Presets:");
-        for (preset_name, _) in presets.iter() {
-            println!("\t{preset_name}");
-        }
-
-        // setup_update_thread(route_to_data_sender.clone(), 3);
+        setup_update_thread(route_to_data_sender.clone(), 10);
 
         for received in receiver {
             match received {
-                DataThreadCommand::Refresh => match load_config(config_location).join() {
-                    Ok(config_handler) => {
-                        let config = config_handler.unwrap();
-                        println!("Refresh Relays: {}", &config.relays.len());
+                DataThreadCommand::Refresh | DataThreadCommand::AutoRefresh => {
+                    match load_config(config_location)
+                        .join()
+                        .expect("Unable to join config thread")
+                    {
+                        Ok(config) => {
+                            let mut relays = relays.lock().expect("Failed to lock relays");
+                            let mut presets = presets.lock().expect("Failed to lock presets");
 
-                        relays = config.relays;
-                        presets = config.presets;
-                        sender
-                            .send(DataThreadResponse::Bool(true))
-                            .expect("Channel possibly not open");
+                            if !config_equals::<RelayType>(&*relays, &config.relays) {
+                                *relays = config.relays;
+                            }
+
+                            if !config_equals::<Preset>(&*presets, &config.presets) {
+                                *presets = config.presets;
+                            }
+
+                            match received {
+                                DataThreadCommand::Refresh => sender
+                                    .send(DataThreadResponse::Bool(true))
+                                    .expect("Channel possibly not open"),
+                                _ => {}
+                            }
+                        }
+                        Err(_) => {
+                            sender
+                                .send(DataThreadResponse::Error(
+                                    "Could not refresh config".to_string(),
+                                ))
+                                .expect("Channel possibly not open");
+                        }
                     }
-                    Err(_) => {
-                        sender
-                            .send(DataThreadResponse::Error(
-                                "Could not refresh config".to_string(),
-                            ))
-                            .expect("Channel possibly not open");
-                    }
-                },
+                }
                 _ => {
+                    let mut relays = relays.lock().expect("Failed to lock relays");
+                    let mut presets = presets.lock().expect("Failed to lock presets");
+
                     let response =
-                        handle_command(received, &mut relays, &mut presets, &current_preset)
+                        handle_command(received, &mut *relays, &mut *presets, &current_preset)
                             .expect("TODO: panic message");
-                    sender.send(response).expect("Channel possibly not open");
+
+                    match response {
+                        DataThreadResponse::Error(error) => {
+                            eprintln!("Error sending command: {:?}", &error);
+                        }
+                        _ => sender.send(response).expect("Channel possibly not open"),
+                    }
                 }
             }
         }
