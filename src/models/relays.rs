@@ -326,7 +326,7 @@ mod tests {
                 "BedroomLight".parse().unwrap(),
             ],
             "Bedroom".parse().unwrap(),
-            vec![]
+            vec![],
         )
         .unwrap();
         assert_eq!(plugs.len(), 2);
