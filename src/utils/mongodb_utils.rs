@@ -1,8 +1,8 @@
-use crate::models::config_models::Config;
+use crate::models::config_models::{Config, ConfigRelay, ConfigRelayType};
+
 use crate::models::presets::Preset;
-use crate::models::relays::{
-    ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug, RelayActions, RelayType,
-};
+use crate::models::relays::{KasaMultiPlug, KasaPlug, RelayActions, RelayType};
+
 use dotenv::dotenv;
 use mongodb::{bson::doc, options::ClientOptions, Client};
 use mongodb::{Collection, Database};
@@ -35,16 +35,24 @@ async fn find_mongo_relays(
     for relay in relay_query {
         match &relay.relay_type {
             ConfigRelayType::KasaPlug => {
-                let mut plug =
-                    KasaPlug::new(relay.ip.clone(), relay.name.clone(), relay.room.clone());
+                let mut plug = KasaPlug::new(
+                    relay.ip.clone(),
+                    relay.name.clone(),
+                    relay.room.clone(),
+                    relay.tags.clone(),
+                );
 
                 if plug.connected().is_ok() {
                     relays.insert(plug.name.clone(), RelayType::KasaPlug(plug));
                 }
             }
             ConfigRelayType::KasaMultiPlug => {
-                let plugs =
-                    KasaMultiPlug::new(relay.ip.clone(), relay.names.clone(), relay.room.clone());
+                let plugs = KasaMultiPlug::new(
+                    relay.ip.clone(),
+                    relay.names.clone(),
+                    relay.room.clone(),
+                    relay.tags.clone(),
+                );
 
                 if plugs.is_ok() {
                     for mut plug in plugs? {

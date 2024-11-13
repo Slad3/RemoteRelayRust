@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use crate::models::config_models::Config;
+use crate::models::config_models::{Config, ConfigRelay, ConfigRelayType};
 use crate::models::presets::Preset;
-use crate::models::relays::{ConfigRelay, ConfigRelayType, KasaMultiPlug, KasaPlug};
+use crate::models::relays::{KasaMultiPlug, KasaPlug};
 use crate::models::relays::{RelayActions, RelayType};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -27,7 +27,7 @@ fn load_relays(from_config: Vec<ConfigRelay>) -> HashMap<String, RelayType> {
     for relay in from_config {
         match relay.relay_type {
             ConfigRelayType::KasaMultiPlug => {
-                let plugs = KasaMultiPlug::new(relay.ip, relay.names, relay.room);
+                let plugs = KasaMultiPlug::new(relay.ip, relay.names, relay.room, relay.tags);
 
                 if plugs.is_ok() {
                     for mut plug in plugs.unwrap() {
@@ -38,7 +38,7 @@ fn load_relays(from_config: Vec<ConfigRelay>) -> HashMap<String, RelayType> {
                 }
             }
             ConfigRelayType::KasaPlug => {
-                let mut plug = KasaPlug::new(relay.ip, relay.name, relay.room);
+                let mut plug = KasaPlug::new(relay.ip, relay.name, relay.room, relay.tags);
                 match plug.connected() {
                     Ok(_) => {
                         relays.insert(plug.name.clone(), RelayType::KasaPlug(plug));

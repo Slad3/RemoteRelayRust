@@ -7,7 +7,7 @@ use std::vec;
 
 use crate::routes::index_routes::{index_route, refresh_route, status_route};
 use crate::routes::preset_routes::{get_preset_names_route, set_preset_route};
-use crate::routes::relay_routes::set_relay_command_route;
+use crate::routes::relay_routes::{set_relay_command_route, set_relays_by_tag_command_route};
 
 use crate::models::channels_models::Channels;
 use crate::models::data_thread_models::{DataThreadCommand, DataThreadResponse};
@@ -72,6 +72,7 @@ async fn rocket() -> _ {
             set_preset_route,
             get_preset_names_route,
             set_relay_command_route,
+            set_relays_by_tag_command_route
         ],
     );
 

@@ -10,13 +10,13 @@ rust-version = "1.79.0"
 version = "0.2.0"
 
 [dependencies]
-serde_json = { version = "1.0.120", features = [] }
+serde_json = { version = "1.0.132", features = [] }
 rocket = { version = "0.5.1", features = ["json"] }
-serde = "1.0.204"
+serde = "1.0.214"
 dotenv = "0.15.0"
-tokio = "1.39.1"
-futures = "0.3.30"
-clap = { version = "4.5.16", features = ["derive"] }
+tokio = "1.41.1"
+futures = "0.3.31"
+clap = { version = "4.5.20", features = ["derive"] }
 
 [dependencies.mongodb]
 version = "3.1.0"

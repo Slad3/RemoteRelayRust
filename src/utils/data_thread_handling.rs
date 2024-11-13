@@ -1,14 +1,17 @@
-use std::cmp::PartialEq;
 use std::collections::{HashMap, HashSet};
 
-use crate::models::data_thread_models::{
-    DataThreadCommand, DataThreadResponse, PresetCommand, RelayCommand, RelayCommands,
+use crate::models::{
+    data_thread_models::{
+        DataThreadCommand, DataThreadResponse, PresetCommand, RelayCommand, RelayCommands,
+        TagCommand,
+    },
+    presets::{get_preset_names, set_preset, Preset},
+    relays::{config_equals, RelayActions, RelayType},
 };
-use crate::models::presets::{get_preset_names, set_preset, Preset};
-use crate::models::relays::{config_equals, RelayActions, RelayType};
 
 use crate::utils::load_config::{load_config, ConfigLocation};
 
+use rocket::form::validate::Contains;
 use rocket::serde::json::Json;
 use serde_json::{json, Value};
 use std::io::{Error, ErrorKind};
@@ -65,6 +68,58 @@ fn handle_relay_command(
     }
 }
 
+fn handle_tag_command(
+    tag_command: TagCommand,
+    relays: &mut HashMap<String, RelayType>,
+    current_preset: &Mutex<String>,
+) -> Result<DataThreadResponse, Error> {
+    match tag_command.command {
+        RelayCommands::SWITCH | RelayCommands::TRUE | RelayCommands::FALSE => {
+            let mut temp_current_preset = current_preset.lock().unwrap();
+            *temp_current_preset = "Custom".to_string()
+        }
+        _ => {}
+    }
+
+    let mut statuses: Vec<Value> = Vec::new();
+
+    let mut found = false;
+    for relay in relays.values_mut().filter(|relay| {
+        let tags = match relay {
+            RelayType::KasaPlug(ref relay) => &relay.tags,
+            RelayType::KasaMultiPlug(ref relay) => &relay.tags,
+        };
+        tags.contains(&tag_command.tag)
+    }) {
+        found = true;
+
+        let _ = match tag_command.command {
+            RelayCommands::SWITCH => {
+                let _ = relay.switch()?;
+            }
+            RelayCommands::TRUE => {
+                let _ = relay.turn_on()?;
+            }
+            RelayCommands::FALSE => {
+                let _ = relay.turn_off()?;
+            }
+            RelayCommands::STATUS => statuses.push(json!({"status": relay.to_json()})),
+        };
+    }
+
+    if !found {
+        return Err(Error::new(
+            ErrorKind::NotFound,
+            format!("No relays with tag: {} found", &tag_command.tag),
+        ));
+    }
+
+    match tag_command.command {
+        RelayCommands::STATUS => Ok(DataThreadResponse::Value(Value::from(statuses))),
+        _ => Ok(DataThreadResponse::Bool(true)),
+    }
+}
+
 fn handle_preset_command(
     preset_command: PresetCommand,
     relays: &mut HashMap<String, RelayType>,
@@ -107,6 +162,9 @@ fn handle_command(
             relays,
             current_preset.lock().unwrap().to_string(),
         )?)),
+        DataThreadCommand::Tag(tag_command) => {
+            handle_tag_command(tag_command, relays, current_preset)
+        }
         DataThreadCommand::Refresh => Ok(DataThreadResponse::Bool(false)),
         DataThreadCommand::AutoRefresh => Ok(DataThreadResponse::Bool(false)),
     }
@@ -211,7 +269,7 @@ pub(crate) fn setup_data_thread(
 
                     let response =
                         handle_command(received, &mut *relays, &mut *presets, &current_preset)
-                            .expect("TODO: panic message");
+                            .unwrap_or_else(|error| DataThreadResponse::Error(error.to_string()));
 
                     match response {
                         DataThreadResponse::Error(error) => {

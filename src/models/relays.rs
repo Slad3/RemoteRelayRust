@@ -6,7 +6,6 @@ use rocket::serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
 use std::io::{Error, ErrorKind};
-use std::vec;
 
 use crate::models::kasa_network_models::{MultiPlugStatus, PlugMutateResponse, PlugStatus};
 use crate::utils::kasa_plug_network_functions;
@@ -15,24 +14,6 @@ use crate::utils::kasa_plug_network_functions;
 pub enum RelayType {
     KasaPlug(KasaPlug),
     KasaMultiPlug(KasaMultiPlug),
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub enum ConfigRelayType {
-    KasaPlug,
-    KasaMultiPlug,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct ConfigRelay {
-    #[serde(rename = "type")]
-    pub(crate) relay_type: ConfigRelayType,
-    #[serde(default)]
-    pub(crate) name: String,
-    #[serde(default)]
-    pub(crate) names: Vec<String>,
-    pub(crate) ip: String,
-    pub(crate) room: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
@@ -69,8 +50,7 @@ pub trait RelayActions<'a>: Debug + Deserialize<'a> + Serialize {
 }
 
 impl KasaPlug {
-    pub fn new(ip: String, name: String, room: String) -> Self {
-        let tags: Vec<String> = Vec::new();
+    pub fn new(ip: String, name: String, room: String, tags: Vec<String>) -> Self {
         KasaPlug {
             ip,
             name,
@@ -143,7 +123,12 @@ impl RelayActions<'_> for KasaPlug {
 }
 
 impl KasaMultiPlug {
-    pub fn new(ip: String, names: Vec<String>, room: String) -> Result<Vec<KasaMultiPlug>, Error> {
+    pub fn new(
+        ip: String,
+        names: Vec<String>,
+        room: String,
+        tags: Vec<String>,
+    ) -> Result<Vec<KasaMultiPlug>, Error> {
         let command = json!({"system": {"get_sysinfo": {}}});
         let response =
             match kasa_plug_network_functions::send::<MultiPlugStatus>(&ip, &command.to_string()) {
@@ -170,8 +155,8 @@ impl KasaMultiPlug {
                 id: child.id.to_string(),
                 name: name.clone(),
                 status: child.state == 1,
-                room: room.clone().parse().unwrap(),
-                tags: Vec::new(),
+                room: room.clone(),
+                tags: tags.clone(),
             })
         }
 
@@ -341,6 +326,7 @@ mod tests {
                 "BedroomLight".parse().unwrap(),
             ],
             "Bedroom".parse().unwrap(),
+            vec![]
         )
         .unwrap();
         assert_eq!(plugs.len(), 2);

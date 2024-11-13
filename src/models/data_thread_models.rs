@@ -14,7 +14,14 @@ pub(crate) enum DataThreadCommand {
     AutoRefresh,
     Refresh,
     Relay(RelayCommand),
+    Tag(TagCommand),
     Preset(PresetCommand),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub(crate) struct TagCommand {
+    pub(crate) tag: String,
+    pub(crate) command: RelayCommands,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
