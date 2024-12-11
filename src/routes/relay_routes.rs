@@ -26,14 +26,15 @@ pub(crate) async fn set_relay_command_route(
         }
     };
 
-    if let Err(_) = channels.route_to_data_sender.send(Relay(RelayCommand {
+    match channels.route_to_data_sender.send(Relay(RelayCommand {
         name: relay_name.parse().unwrap(),
         command: command_processed,
-    })) {
-        return ApiResponse {
-            value: Json(json!({"Error": "Channel closed"})),
-            status: Status::new(500),
-        };
+    })){
+        Ok(something ) => {println!("{:?}", something)},
+        Err(error) => return ApiResponse {
+            value: Json(json!({"Error": format!("Could not find relay name in relays {}", error)})),
+            status: Status::NotFound,
+        }
     }
 
     match channels.data_to_route_receiver.lock().unwrap().recv() {

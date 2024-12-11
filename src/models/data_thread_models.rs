@@ -41,7 +41,8 @@ pub(crate) enum PresetCommand {
 pub(crate) enum RelayCommands {
     #[serde(rename = "true")]
     TRUE,
+    #[serde(rename = "false")]
     FALSE,
     SWITCH,
-    STATUS,
+    STATUS
 }

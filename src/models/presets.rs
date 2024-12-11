@@ -1,4 +1,5 @@
 use crate::models::relays::{RelayActions, RelayType};
+use rocket::log;
 use rocket::serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -16,17 +17,19 @@ pub(crate) fn set_preset(
     relays: &mut HashMap<String, RelayType>,
 ) -> Result<Value, Error> {
     for (relay_name, relay) in relays.iter_mut() {
-        match preset.relays.get_key_value(relay_name) {
+        let result = match preset.relays.get_key_value(relay_name) {
             Some((_, &value)) => {
                 if value {
-                    relay.turn_on().expect("Couldn't turn on");
+                    relay.turn_on()
                 } else {
-                    relay.turn_off().expect("Couldn't turn off");
+                    relay.turn_off()
                 }
             }
-            None => {
-                relay.turn_off().expect("Couldn't turn off");
-            }
+            None => relay.turn_off(),
+        };
+        if Err(result) {
+            log::warn_!("Failed to set relay turn on: {}", relay_name);
+            return Ok(json!({"presetSet": false}));
         }
     }
 
