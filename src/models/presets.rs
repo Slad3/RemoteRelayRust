@@ -27,7 +27,7 @@ pub(crate) fn set_preset(
             }
             None => relay.turn_off(),
         };
-        if Err(result) {
+        if result.is_err() {
             log::warn_!("Failed to set relay turn on: {}", relay_name);
             return Ok(json!({"presetSet": false}));
         }
