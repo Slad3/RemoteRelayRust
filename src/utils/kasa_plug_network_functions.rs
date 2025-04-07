@@ -8,7 +8,7 @@ use std::net::ToSocketAddrs;
 use std::time::Duration;
 use std::vec;
 
-const TIMEOUT: Duration = Duration::from_millis(100);
+const TIMEOUT: Duration = Duration::from_millis(300);
 
 pub fn decrypt(string: Vec<u8>) -> String {
     let key: u8 = 171;
