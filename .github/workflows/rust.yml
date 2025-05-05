@@ -20,12 +20,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build Debian
-        run: cargo install cargo-deb && cargo build --release --verbose && cargo deb
+        run: cargo build --release --verbose && cargo deb
 
       - name: Deploy to gh-pages
         uses: peaceiris/actions-gh-pages@v3
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./target/release/debian
+          publish_dir: target/debian
           publish_branch: gh-pages
           force_orphan: true
