@@ -2,30 +2,26 @@ name: Rust Build Linux Test
 
 on:
   push:
-    branches: [ "master" ]
+    branches: ["master"]
   pull_request:
-    branches: [ "master" ]
+    branches: ["master"]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Build Debian
-      run: cargo install cargo-deb
-      run: cargo build --release --verbose
-      run: cargo deb
+      - uses: actions/checkout@v4
+      - name: Build Debian
+        run: cargo install cargo-deb && cargo build --release --verbose && cargo deb
 
-
-    - name: Deploy to gh-pages
-      uses: peaceiris/actions-gh-pages@v3
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./target/release/debian
-        publish_branch: gh-pages
-        force_orphan: true
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./target/release/debian
+          publish_branch: gh-pages
+          force_orphan: true
