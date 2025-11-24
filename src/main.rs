@@ -63,7 +63,9 @@ async fn rocket() -> _ {
 
     let _ = data_thread.thread();
 
-    let server = rocket::build().attach(Cors).manage(channels).mount(
+    let figment = rocket::Config::figment().merge(("port", 8001));
+
+    let server = rocket::custom(figment).attach(Cors).manage(channels).mount(
         "/",
         routes![
             index_route,
