@@ -7,7 +7,7 @@ license = "MIT"
 name = "remoterelay"
 repository = "https://github.com/Slad3/RemoteRelayRust"
 rust-version = "1.86.0"
-version = "0.2.0"
+version = "0.3.3"
 
 [dependencies]
 serde_json = { version = "1.0.132", features = [] }
@@ -39,6 +39,21 @@ path = "target/release/remoterelay"
 
 [[package.metadata.rpm.assets]]
 source = "remoterelay"
-dest = "bin/remoterelay"     # ← change this from "/usr/bin/remoterelay" to relative
+dest = "bin/remoterelay"
 mode = "755"
 relative = true
+
+
+[package.metadata.generate-rpm]
+name = "remoterelay"
+license = "MIT"
+
+[[package.metadata.generate-rpm.assets]]
+source = "target/release/remoterelay"
+dest = "/usr/bin/remoterelay"
+mode = "755"
+
+[[package.metadata.generate-rpm.assets]]
+source = "remoterelay.service"
+dest = "/usr/lib/systemd/system/remoterelay.service"
+mode = "644"

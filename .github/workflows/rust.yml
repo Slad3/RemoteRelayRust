@@ -29,3 +29,6 @@ jobs:
           publish_dir: target/debian
           publish_branch: gh-pages
           force_orphan: true
+
+    release:
+      runs-on: ubuntu-latest
