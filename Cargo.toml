@@ -4,9 +4,9 @@ description = "Http server that allows a user to control their in-home smartplug
 edition = "2021"
 homepage = "https://github.com/Slad3/RemoteRelayRust"
 license = "MIT"
-name = "remote_relay_rust"
+name = "remoterelay"
 repository = "https://github.com/Slad3/RemoteRelayRust"
-rust-version = "1.79.0"
+rust-version = "1.86.0"
 version = "0.2.0"
 
 [dependencies]
@@ -24,3 +24,21 @@ features = ["sync"]
 
 [package.metadata.precommit]
 fmt = "cargo fmt"
+
+[package.metadata.deb]
+depends = ["libgcc-s1 (>= 3.0)"]
+
+[package.metadata.rpm]
+name = "remoterelay"
+license = "MIT"
+prefix = "/usr"
+
+
+[package.metadata.rpm.targets.x86_64-unknown-linux-gnu]
+path = "target/release/remoterelay"
+
+[[package.metadata.rpm.assets]]
+source = "remoterelay"
+dest = "bin/remoterelay"     # ← change this from "/usr/bin/remoterelay" to relative
+mode = "755"
+relative = true

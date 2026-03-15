@@ -1,0 +1,15 @@
+# /etc/systemd/system/remoterelay.service
+[Unit]
+Description=RemoteRelay - Remote smart plug control server
+After=network.target
+
+[Service]
+Type=simple
+User=remoterelay
+ExecStart=/usr/bin/remoterelay --config=mongo
+Restart=on-failure
+RestartSec=5
+EnvironmentFile=-/etc/remoterelay/.env
+
+[Install]
+WantedBy=multi-user.target
